@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 
 // ─── ANTHROPIC API KEY — replaced by backend proxy after Vercel setup ────────
-
+const ANTHROPIC_KEY = "YOUR_KEY_HERE";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // PostLift Logo
