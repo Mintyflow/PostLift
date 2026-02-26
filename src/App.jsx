@@ -1108,7 +1108,7 @@ function ReferralNudge(){
   });
   if(dismissed) return null;
 
-  const refUrl="https://postlift.app/?ref=friend";
+  const refUrl="https://trypostlift.com/?ref=friend";
   function copy(){
     copyText(refUrl);
     setCopied(true);
@@ -2130,7 +2130,7 @@ function PricingPage({currency,goPage}){
         <h2 style={{fontSize:"clamp(20px,4vw,36px)",fontWeight:"900",color:C.text,margin:"0 0 6px"}}>Simple, transparent pricing</h2>
         <p style={{color:C.mid,fontSize:"14px",margin:"0 0 12px"}}>Start free. Upgrade when ready.</p>
         <div style={{display:"inline-flex",alignItems:"center",gap:"8px",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:"20px",padding:"6px 16px",fontSize:"12px",color:"#22c55e",fontWeight:"700",marginBottom:"6px"}}>
-          Save 35% with annual Pro — just {currency==="GBP"?"£117":"$149"}/year
+          Save 20% with annual Pro — just {currency==="GBP"?"£144":"$182"}/year
         </div>
         <div style={{fontSize:"11px",color:C.dim}}>Secure payments by Stripe</div>
       </div>
@@ -2185,7 +2185,7 @@ function AffiliatePage({currency,goPage}){
     setMyCode(code);
     setAffDone(true);
   }
-  const refLink=myCode?"https://postlift.app/?ref="+myCode:"";
+  const refLink=myCode?"https://trypostlift.com/?ref="+myCode:"";
   const stats=myCode?getAffStats(myCode):{clicks:0,signups:0,conversions:0,earned:0};
   const COMM=0.30;
   const TABS=[["overview","Overview"],["dashboard","Dashboard"],["resources","Resources"],["faq","FAQ"]];
@@ -2271,10 +2271,10 @@ function AffiliatePage({currency,goPage}){
               <h3 style={{color:"#edf0f7",fontWeight:"900",fontSize:"20px",margin:"0 0 8px"}}>{"Welcome aboard, "+name2.split(" ")[0]+"!"}</h3>
               <p style={{color:"#9ca3af",fontSize:"14px",margin:"0 0 20px",lineHeight:1.7}}>{"Your affiliate account is active. Your unique referral link is ready to share — start earning 30% commission today."}</p>
               <div style={{background:"#161922",border:"1px solid rgba(255,255,255,0.08)",borderRadius:"10px",padding:"14px 18px",fontSize:"13px",color:"#edf0f7",fontFamily:"monospace",wordBreak:"break-all",marginBottom:"16px",maxWidth:"480px",margin:"0 auto 16px"}}>
-                {"https://postlift.app/?ref="+myCode}
+                {"https://trypostlift.com/?ref="+myCode}
               </div>
               <div style={{display:"flex",gap:"10px",justifyContent:"center",flexWrap:"wrap"}}>
-                <CopyBtn text={"https://postlift.app/?ref="+myCode} label="Copy referral link"/>
+                <CopyBtn text={"https://trypostlift.com/?ref="+myCode} label="Copy referral link"/>
                 <button onClick={()=>setTab("dashboard")} className="btn" style={{padding:"11px 20px",borderRadius:"9px",border:"1px solid rgba(200,117,51,0.5)",background:"transparent",color:"#c87533",fontWeight:"700",fontSize:"13px",cursor:"pointer"}}>View dashboard</button>
               </div>
             </div>
@@ -2424,7 +2424,7 @@ function PrivacyPage(){
   return(<LegalShell title="Privacy Policy"><Pp c="This Privacy Policy explains how Marvanova collects and protects your personal data when you use PostLift. We comply with UK GDPR and the Data Protection Act 2018."/><H2 c="1. Who We Are"/><Pp c="PostLift is a product of Marvanova, Sevenoaks, Kent, UK. Contact: apps@marvanova.com"/><Note c="Add registered company number if/when Marvanova incorporates."/><H2 c="2. Data We Collect"/><Pp c="Account data (name, email, hashed password) for registered users. Topics you enter are sent to the Anthropic API to generate posts and are not stored by us long-term. Stripe handles all payment data."/><H2 c="3. How We Use Your Data"/><Pp c="To provide the service; authenticate your account; process payments via Stripe; improve the product. No marketing without opt-in."/><H2 c="4. AI Processing"/><Pp c="Post content you generate is processed by the Anthropic Claude API. Please review Anthropic privacy policy at anthropic.com/privacy."/><H2 c="5. Your Rights (UK GDPR)"/><Pp c="Access, correct, delete, restrict or port your data. Email apps@marvanova.com. We respond within 30 days. Escalate to ICO at ico.org.uk."/><Note c="Register with ICO as a data controller. Around 40-60 pounds per year."/></LegalShell>);
 }
 function CookiePolicyPage(){
-  return(<LegalShell title="Cookie Policy"><Pp c="PostLift (operated by Marvanova) uses cookies and browser storage as described below."/><H2 c="1. Strictly Necessary"/><Pp c="Session authentication and your cookie consent preference stored in localStorage. Cannot be disabled."/><H2 c="2. Preference Cookies"/><Pp c="Currency selection and post usage count stored in localStorage. No personal data transmitted to servers."/><H2 c="3. Advertising (Consent Required)"/><Pp c="Google AdSense cookies for personalised ads if you accept. Opt out at g.co/adsettings or youronlinechoices.com."/><H2 c="4. Managing Preferences"/><Pp c="Use the banner on first visit. Contact apps@marvanova.com with questions."/></LegalShell>);
+  return(<LegalShell title="Cookie Policy"><Pp c="PostLift (operated by Marvanova) uses cookies and browser storage as described below."/><H2 c="1. Strictly Necessary"/><Pp c="Session authentication and your cookie consent preference stored in localStorage. Cannot be disabled."/><H2 c="2. Preference Cookies"/><Pp c="Currency selection and post usage count stored in localStorage. No personal data transmitted to servers."/><H2 c="3. Analytics (Optional)"/><Pp c="We may use privacy-friendly analytics to understand how PostLift is used and improve the product. No personal data is shared with advertisers."/><H2 c="4. Managing Preferences"/><Pp c="Use the banner on first visit. Contact apps@marvanova.com with questions."/></LegalShell>);
 }
 function TermsPage(){
   return(<LegalShell title="Terms of Service">
@@ -2897,7 +2897,7 @@ function Footer({goPage}){
 function CookieBanner({onAccept,onDecline}){
   return(
     <div style={{position:"fixed",bottom:0,left:0,right:0,zIndex:500,background:C.raised,borderTop:"1px solid "+C.border,padding:"14px 20px",display:"flex",flexWrap:"wrap",alignItems:"center",gap:"12px",boxShadow:"0 -4px 24px rgba(0,0,0,0.5)",animation:"up .4s ease"}}>
-      <div style={{flex:1,minWidth:"200px",fontSize:"13px",color:C.mid,lineHeight:1.5}}>We use cookies to remember your preferences and serve relevant ads via Google AdSense.</div>
+      <div style={{flex:1,minWidth:"200px",fontSize:"13px",color:C.mid,lineHeight:1.5}}>We use cookies to remember your preferences and keep you signed in. No data is sold. See our <span style={{color:C.amber,cursor:"pointer",textDecoration:"underline"}} onClick={()=>{}}>Cookie Policy</span> for details.</div>
       <div style={{display:"flex",gap:"8px",flexShrink:0}}>
         <button onClick={onDecline} className="btn" style={{padding:"8px 16px",borderRadius:"8px",border:"1px solid "+C.border,background:"transparent",color:C.mid,cursor:"pointer",fontSize:"13px",fontWeight:"600"}}>Decline</button>
         <button onClick={onAccept} className="btn" style={{padding:"8px 16px",borderRadius:"8px",border:"none",background:GRAD_AMBER,color:"#fff",cursor:"pointer",fontSize:"13px",fontWeight:"700"}}>Accept</button>
