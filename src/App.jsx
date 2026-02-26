@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
 
-// ─── ANTHROPIC API KEY — replaced by backend proxy after Vercel setup ────────
-const ANTHROPIC_KEY = "YOUR_KEY_HERE";
+// ─── ANTHROPIC API KEY — loaded securely from Vercel environment variables ───
+const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_KEY || "";
 // ─────────────────────────────────────────────────────────────────────────────
 
 // PostLift Logo
@@ -545,9 +545,9 @@ async function genPost(cfg,styleId,attempt,staggerOffset){
   try{
     if(attempt===0&&staggerOffset>0) await new Promise(r=>setTimeout(r,staggerOffset));
     if(attempt>0) await new Promise(r=>setTimeout(r,retryDelay));
-    const res=await fetch("https://api.anthropic.com/v1/messages",{
+    const res=await fetch("/api/generate",{
       method:"POST",
-      headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
+      headers:{"Content-Type":"application/json"},
       body:JSON.stringify({
         model:"claude-haiku-4-5-20251001",
         max_tokens:450,
@@ -1789,9 +1789,9 @@ function AddonModal({addonId,currency,onClose}){
     setErr(""); setLoading(true); setResult(null);
     try{
       const prompt=cfg.buildPrompt(vals);
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
+      const res=await fetch("/api/generate",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":ANTHROPIC_KEY,"anthropic-version":"2023-06-01"},
+        headers:{"Content-Type":"application/json"},
         body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1800,messages:[{role:"user",content:prompt}]})
       });
       if(!res.ok) throw new Error("API error "+res.status);
