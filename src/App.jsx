@@ -915,7 +915,7 @@ function UpgradeModal({plan,currency,onClose}){
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:"20px",padding:"36px 28px",maxWidth:"420px",width:"100%",border:"1px solid rgba(230,125,50,0.35)",animation:"up .3s ease",textAlign:"center"}}>
         <div style={{fontSize:"44px",marginBottom:"12px"}}>{"🚀"}</div>
         <h2 style={{color:C.text,fontWeight:"900",fontSize:"22px",marginBottom:"8px"}}>{"Upgrade to "+plan}</h2>
-        <div style={{fontSize:"36px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{sym+price}</div>
+        <div style={{fontSize:"36px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{price}</div>
         <div style={{fontSize:"12px",color:C.mid,marginBottom:"20px"}}>per month · cancel anytime · secure payment by Stripe</div>
         <div style={{background:C.raised,borderRadius:"10px",padding:"14px 16px",marginBottom:"20px",border:"1px solid "+C.border,textAlign:"left"}}>
           <div style={{fontWeight:"700",color:C.text,marginBottom:"8px",fontSize:"13px"}}>{"What's included:"}</div>
@@ -929,7 +929,7 @@ function UpgradeModal({plan,currency,onClose}){
         {err&&<div style={{fontSize:"12px",color:C.red,marginBottom:"12px",background:"rgba(239,68,68,0.1)",padding:"8px 12px",borderRadius:"8px"}}>{err}</div>}
         <button className="btn" onClick={handleCheckout} disabled={loading}
           style={{display:"block",width:"100%",padding:"14px",borderRadius:"10px",border:"none",background:loading?"#555":GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"15px",cursor:loading?"not-allowed":"pointer",marginBottom:"10px"}}>
-          {loading?<><Spinner/>{"Redirecting to checkout..."}</>:"Continue to Payment → "+sym+price+"/month"}
+          {loading?<><Spinner/>{"Redirecting to checkout..."}</>:"Continue to Payment → "+price+"/month"}
         </button>
         <button onClick={onClose} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"13px"}}>Maybe later</button>
       </div>
