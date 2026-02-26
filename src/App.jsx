@@ -888,29 +888,48 @@ function ShareToLinkedIn({text,onCopy}){
 
 function UpgradeModal({plan,currency,onClose}){
   if(!plan) plan="Pro";
+  const {user}=useAuth();
   const p=PRICING[currency];
   const price=plan==="Pro"?p.pro:p.team;
   const sym=p.sym;
   const feats=plan==="Pro"?PRO_FEAT:TEAM_FEAT;
+  const [loading,setLoading]=useState(false);
+  const [err,setErr]=useState("");
+
+  async function handleCheckout(){
+    setLoading(true); setErr("");
+    try{
+      const res=await fetch("/api/checkout",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({plan:plan.toLowerCase(),currency,email:user?.email||""})
+      });
+      const data=await res.json();
+      if(data.url){ window.location.href=data.url; }
+      else{ setErr(data.error||"Something went wrong. Please try again."); setLoading(false); }
+    }catch(e){ setErr("Could not connect. Please try again."); setLoading(false); }
+  }
+
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.85)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",animation:"in .2s ease"}}>
       <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:"20px",padding:"36px 28px",maxWidth:"420px",width:"100%",border:"1px solid rgba(230,125,50,0.35)",animation:"up .3s ease",textAlign:"center"}}>
-        <div style={{fontSize:"44px",marginBottom:"12px"}}>{"!"}</div>
+        <div style={{fontSize:"44px",marginBottom:"12px"}}>{"🚀"}</div>
         <h2 style={{color:C.text,fontWeight:"900",fontSize:"22px",marginBottom:"8px"}}>{"Upgrade to "+plan}</h2>
         <div style={{fontSize:"36px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{sym+price}</div>
-        <div style={{fontSize:"12px",color:C.mid,marginBottom:"20px"}}>per month, cancel anytime</div>
+        <div style={{fontSize:"12px",color:C.mid,marginBottom:"20px"}}>per month · cancel anytime · secure payment by Stripe</div>
         <div style={{background:C.raised,borderRadius:"10px",padding:"14px 16px",marginBottom:"20px",border:"1px solid "+C.border,textAlign:"left"}}>
-          <div style={{fontWeight:"700",color:C.text,marginBottom:"8px",fontSize:"13px"}}>What is included:</div>
+          <div style={{fontWeight:"700",color:C.text,marginBottom:"8px",fontSize:"13px"}}>{"What's included:"}</div>
           {feats.slice(0,5).map(f=>(
             <div key={f.name} style={{display:"flex",gap:"8px",marginBottom:"5px",fontSize:"12px",color:C.mid}}>
-              <span style={{color:C.green}}>{"ok"}</span><span>{f.name}</span>
+              <span style={{color:C.green}}>{"✓"}</span><span>{f.name}</span>
             </div>
           ))}
           {feats.length>5&&<div style={{color:C.amber,marginTop:"4px",fontSize:"11px"}}>{"+ "+(feats.length-5)+" more features"}</div>}
         </div>
-        <button className="btn" onClick={()=>{ alert("Stripe integration: add your Stripe publishable key and price ID to activate payments."); onClose(); }}
-          style={{display:"block",width:"100%",padding:"14px",borderRadius:"10px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"15px",cursor:"pointer",marginBottom:"10px"}}>
-          Continue to Payment
+        {err&&<div style={{fontSize:"12px",color:C.red,marginBottom:"12px",background:"rgba(239,68,68,0.1)",padding:"8px 12px",borderRadius:"8px"}}>{err}</div>}
+        <button className="btn" onClick={handleCheckout} disabled={loading}
+          style={{display:"block",width:"100%",padding:"14px",borderRadius:"10px",border:"none",background:loading?"#555":GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"15px",cursor:loading?"not-allowed":"pointer",marginBottom:"10px"}}>
+          {loading?<><Spinner/>{"Redirecting to checkout..."}</>:"Continue to Payment → "+sym+price+"/month"}
         </button>
         <button onClick={onClose} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"13px"}}>Maybe later</button>
       </div>
@@ -2908,6 +2927,27 @@ function CookieBanner({onAccept,onDecline}){
 
 function AppInner(){
   const [page,setPage]=useState("home");
+  // Handle Stripe success/cancel redirect
+  useEffect(()=>{
+    const params=new URLSearchParams(window.location.search);
+    const upgrade=params.get("upgrade");
+    const plan=params.get("plan");
+    if(upgrade==="success"&&plan){
+      // Auto-upgrade user plan in localStorage
+      try{
+        const cu=JSON.parse(localStorage.getItem("pl_user")||"null");
+        if(cu){ cu.plan=plan; localStorage.setItem("pl_user",JSON.stringify(cu));
+          const users=JSON.parse(localStorage.getItem("pl_users")||"[]");
+          const idx=users.findIndex(u=>u.email===cu.email);
+          if(idx>-1){ users[idx].plan=plan; localStorage.setItem("pl_users",JSON.stringify(users)); }
+        }
+      }catch(e){}
+      window.history.replaceState({},"","/");
+      alert("🎉 Welcome to "+plan.charAt(0).toUpperCase()+plan.slice(1)+"! Your account has been upgraded.");
+    } else if(upgrade==="cancelled"){
+      window.history.replaceState({},"","/");
+    }
+  },[]);
   const [currency,setCurrency]=useState("USD");
   const [isUK,setIsUK]=useState(false);
   const [cookies,setCookies]=useState(null);
