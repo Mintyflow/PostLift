@@ -446,64 +446,87 @@ function useAuth(){ return useContext(AuthCtx); }
 
 function AuthProvider({children}){
   const [user,setUser] = useState(null);
+  const [authLoading,setAuthLoading] = useState(false);
+
   useEffect(()=>{
     try{ const u=localStorage.getItem("pl_user"); if(u) setUser(JSON.parse(u)); }catch(e){}
   },[]);
-  function signup(name,email,password){
-    let users=[];
-    try{ users=JSON.parse(localStorage.getItem("pl_users")||"[]"); }catch(e){}
-    if(users.find(u=>u.email===email)) return {error:"An account with that email already exists."};
-    const u={name,email,password,plan:"free",joined:new Date().toISOString(),postsUsed:0,postsUsedMonth:0,usageMonth:getMonthKey()};
-    users.push(u);
-    localStorage.setItem("pl_users",JSON.stringify(users));
-    localStorage.setItem("pl_user",JSON.stringify(u));
-    setUser(u);
-    return {ok:true};
+
+  async function signup(name,email,password){
+    setAuthLoading(true);
+    try{
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"register",name,email,password})});
+      const data=await res.json();
+      if(data.error){ setAuthLoading(false); return {error:data.error}; }
+      localStorage.setItem("pl_user",JSON.stringify(data.user));
+      setUser(data.user);
+      setAuthLoading(false);
+      return {ok:true};
+    }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
   }
-  function login(email,password){
-    let users=[];
-    try{ users=JSON.parse(localStorage.getItem("pl_users")||"[]"); }catch(e){}
-    const u=users.find(u=>u.email===email&&u.password===password);
-    if(!u) return {error:"Incorrect email or password."};
-    localStorage.setItem("pl_user",JSON.stringify(u));
-    setUser(u);
-    return {ok:true};
+
+  async function login(email,password){
+    setAuthLoading(true);
+    try{
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"login",email,password})});
+      const data=await res.json();
+      if(data.error){ setAuthLoading(false); return {error:data.error}; }
+      localStorage.setItem("pl_user",JSON.stringify(data.user));
+      setUser(data.user);
+      setAuthLoading(false);
+      return {ok:true};
+    }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
   }
+
   function logout(){
     localStorage.removeItem("pl_user");
     setUser(null);
   }
-  function updateUsage(){
-    let users=[];
-    try{ users=JSON.parse(localStorage.getItem("pl_users")||"[]"); }catch(e){}
-    const idx=users.findIndex(u=>u.email===user?.email);
-    if(idx>=0){
-      const thisMonth=getMonthKey();
-      const storedMonth=users[idx].usageMonth||"";
-      // Reset counter if we've crossed into a new calendar month
-      if(storedMonth!==thisMonth){
-        users[idx].postsUsedMonth=0;
-        users[idx].usageMonth=thisMonth;
+
+  async function updateUsage(){
+    if(!user?.id) return;
+    try{
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"increment",userId:user.id})});
+      const data=await res.json();
+      if(data.posts_used!==undefined){
+        const updated={...user,posts_used:data.posts_used,postsUsedMonth:data.posts_used};
+        localStorage.setItem("pl_user",JSON.stringify(updated));
+        setUser(updated);
       }
-      users[idx].postsUsedMonth=(users[idx].postsUsedMonth||0)+1;
-      // Keep postsUsed as a lifetime total for analytics
-      users[idx].postsUsed=(users[idx].postsUsed||0)+1;
-      // Sharing detection: flag if usage is unusually high early in month
-      const dayOfMonth=new Date().getDate();
-      const monthlyUsed=users[idx].postsUsedMonth||0;
-      if(users[idx].plan==="pro"&&monthlyUsed>60&&dayOfMonth<10){
-        users[idx].sharingFlag=true;
-      }
-      if(users[idx].plan==="team"&&monthlyUsed>150&&dayOfMonth<10){
-        users[idx].sharingFlag=true;
-      }
-      localStorage.setItem("pl_users",JSON.stringify(users));
-      const updated={...users[idx]};
-      localStorage.setItem("pl_user",JSON.stringify(updated));
-      setUser(updated);
-    }
+    }catch(e){}
   }
-  return <AuthCtx.Provider value={{user,signup,login,logout,updateUsage}}>{children}</AuthCtx.Provider>;
+
+  async function savePost(style,content,topic){
+    if(!user?.id) return null;
+    try{
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"save_post",userId:user.id,style,content,topic})});
+      const data=await res.json();
+      return data.post||null;
+    }catch(e){ return null; }
+  }
+
+  async function getSavedPosts(){
+    if(!user?.id) return [];
+    try{
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"get_posts",userId:user.id})});
+      const data=await res.json();
+      return data.posts||[];
+    }catch(e){ return []; }
+  }
+
+  async function deletePost(postId){
+    try{
+      await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"delete_post",postId})});
+    }catch(e){}
+  }
+
+  return <AuthCtx.Provider value={{user,signup,login,logout,updateUsage,savePost,getSavedPosts,deletePost,authLoading}}>{children}</AuthCtx.Provider>;
 }
 
 function buildPrompt(cfg,styleId){
@@ -784,20 +807,18 @@ function PostCardText({text}){
 }
 
 function SaveButton({postId,label,text}){
-  const [saved,setSaved]=useState(()=>isPostSaved(postId));
+  const {user,savePost:savePostDB,deletePost:deletePostDB}=useAuth();
+  const [saved,setSaved]=useState(false);
+  const [dbId,setDbId]=useState(null);
   const [flash,setFlash]=useState(false);
-  function toggle(){
+  async function toggle(){
+    if(!user){ alert("Please sign in to save posts!"); return; }
     if(saved){
-      unsavePost(postId);
-      setSaved(false);
+      if(dbId) await deletePostDB(dbId);
+      setSaved(false); setDbId(null);
     } else {
-      const ok=savePost({
-        id:postId,
-        label,
-        text,
-        savedAt:new Date().toISOString()
-      });
-      if(ok){ setSaved(true); setFlash(true); setTimeout(()=>setFlash(false),1500); }
+      const post=await savePostDB(label,text,postId);
+      if(post){ setSaved(true); setDbId(post.id); setFlash(true); setTimeout(()=>setFlash(false),1500); }
     }
   }
   return(
@@ -2779,14 +2800,25 @@ function ToolsPage(){
 }
 
 function MyPostsPage({goPage}){
-  const [saved,setSaved]=useState(()=>getSavedPosts());
+  const {user,getSavedPosts:getSavedPostsDB,deletePost:deletePostDB}=useAuth();
+  const [saved,setSaved]=useState([]);
   const [search,setSearch]=useState("");
   const [copied,setCopied]=useState(null);
   const [confirmDel,setConfirmDel]=useState(null);
+  const [loading,setLoading]=useState(true);
 
-  function doDelete(id){
-    unsavePost(id);
-    setSaved(getSavedPosts());
+  useEffect(()=>{
+    if(user){
+      getSavedPostsDB().then(posts=>{
+        setSaved(posts.map(p=>({...p,text:p.content,label:p.style})));
+        setLoading(false);
+      });
+    } else { setLoading(false); }
+  },[user]);
+
+  async function doDelete(id){
+    await deletePostDB(id);
+    setSaved(prev=>prev.filter(p=>p.id!==id));
     setConfirmDel(null);
   }
   function doCopy(id,text){
@@ -2947,10 +2979,12 @@ function AppInner(){
       // Auto-upgrade user plan in localStorage
       try{
         const cu=JSON.parse(localStorage.getItem("pl_user")||"null");
-        if(cu){ cu.plan=plan; localStorage.setItem("pl_user",JSON.stringify(cu));
-          const users=JSON.parse(localStorage.getItem("pl_users")||"[]");
-          const idx=users.findIndex(u=>u.email===cu.email);
-          if(idx>-1){ users[idx].plan=plan; localStorage.setItem("pl_users",JSON.stringify(users)); }
+        if(cu){
+          // Update plan in Supabase
+          fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({action:"upgrade",userId:cu.id,plan})}).catch(()=>{});
+          cu.plan=plan;
+          localStorage.setItem("pl_user",JSON.stringify(cu));
         }
       }catch(e){}
       window.history.replaceState({},"","/");
