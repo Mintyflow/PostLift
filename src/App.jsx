@@ -410,23 +410,23 @@ const STYLES = [
 ];
 
 const PRO_FEAT = [
-  {icon:"📅",name:"Post Scheduler",desc:"Queue posts up to 3 months ahead"},
-  {icon:"📊",name:"Performance Analytics",desc:"Track reach, clicks and engagement"},
   {icon:"✏️",name:"Post Improver",desc:"AI rewrites any post on demand"},
-  {icon:"💬",name:"Comment Generator",desc:"Smart, relevant replies in seconds"},
-  {icon:"🎠",name:"Carousel Creator",desc:"Multi-slide LinkedIn carousels"},
-  {icon:"⏰",name:"Best Time to Post",desc:"AI picks your peak moment"},
-  {icon:"🔍",name:"Hashtag Research",desc:"Find trending tags in your niche"},
-  {icon:"📚",name:"Content Library",desc:"Save, tag and reuse your best posts"}
+  {icon:"📚",name:"Content Library",desc:"Save, tag and reuse your best posts"},
+  {icon:"📅",name:"Post Scheduler",desc:"Queue posts up to 3 months ahead",soon:true},
+  {icon:"📊",name:"Performance Analytics",desc:"Track reach, clicks and engagement",soon:true},
+  {icon:"💬",name:"Comment Generator",desc:"Smart, relevant replies in seconds",soon:true},
+  {icon:"🎠",name:"Carousel Creator",desc:"Multi-slide LinkedIn carousels",soon:true},
+  {icon:"⏰",name:"Best Time to Post",desc:"AI picks your peak moment",soon:true},
+  {icon:"🔍",name:"Hashtag Research",desc:"Find trending tags in your niche",soon:true}
 ];
 
 const TEAM_FEAT = [
   {icon:"👥",name:"3 seats included",desc:"Invite 2 teammates — each gets their own login"},
   {icon:"➕",name:"Extra seats from £12/seat",desc:"Add more teammates any time"},
-  {icon:"🗣️",name:"Brand Voice Training",desc:"AI writes in your exact tone"},
-  {icon:"📆",name:"30-Day Calendar",desc:"Your full month, planned in minutes"},
-  {icon:"🔬",name:"Competitor Analysis",desc:"Discover what works in your space"},
-  {icon:"🏷️",name:"White Label",desc:"Remove PostLift branding entirely"},
+  {icon:"🗣️",name:"Brand Voice Training",desc:"AI writes in your exact tone",soon:true},
+  {icon:"📆",name:"30-Day Calendar",desc:"Your full month, planned in minutes",soon:true},
+  {icon:"🔬",name:"Competitor Analysis",desc:"Discover what works in your space",soon:true},
+  {icon:"🏷️",name:"White Label",desc:"Remove PostLift branding entirely",soon:true},
   {icon:"📊",name:"500 posts/month shared",desc:"Pooled across all seats — plenty for any team"}
 ];
 
@@ -920,8 +920,10 @@ function UpgradeModal({plan,currency,onClose}){
         <div style={{background:C.raised,borderRadius:"10px",padding:"14px 16px",marginBottom:"20px",border:"1px solid "+C.border,textAlign:"left"}}>
           <div style={{fontWeight:"700",color:C.text,marginBottom:"8px",fontSize:"13px"}}>{"What's included:"}</div>
           {feats.slice(0,5).map(f=>(
-            <div key={f.name} style={{display:"flex",gap:"8px",marginBottom:"5px",fontSize:"12px",color:C.mid}}>
-              <span style={{color:C.green}}>{"✓"}</span><span>{f.name}</span>
+            <div key={f.name} style={{display:"flex",gap:"8px",marginBottom:"5px",fontSize:"12px",color:f.soon?C.dim:C.mid,alignItems:"center"}}>
+              <span style={{color:f.soon?C.dim:C.green}}>{f.soon?"◦":"✓"}</span>
+              <span>{f.name}</span>
+              {f.soon&&<span style={{fontSize:"9px",background:"rgba(100,100,120,0.3)",color:C.dim,padding:"1px 5px",borderRadius:"10px",marginLeft:"2px"}}>Soon</span>}
             </div>
           ))}
           {feats.length>5&&<div style={{color:C.amber,marginTop:"4px",fontSize:"11px"}}>{"+ "+(feats.length-5)+" more features"}</div>}
@@ -1578,22 +1580,25 @@ function HomePage({currency,isUK,goPage}){
 
 function FeaturesPage({currency,goPage}){
   const p=PRICING[currency];
-  function FCard({icon,name,desc}){
+  function FCard({icon,name,desc,soon}){
     const [hov,setHov]=useState(false);
     return(
       <div
         onMouseEnter={()=>setHov(true)}
         onMouseLeave={()=>setHov(false)}
         style={{
-          background:hov?"rgba(200,117,51,0.08)":C.card,
-          border:"1px solid "+(hov?"rgba(200,117,51,0.45)":C.border),
+          background:hov&&!soon?"rgba(200,117,51,0.08)":C.card,
+          border:"1px solid "+(hov&&!soon?"rgba(200,117,51,0.45)":C.border),
           borderRadius:"14px",
           padding:"20px 18px",
           cursor:"default",
           transition:"all .22s ease",
-          transform:hov?"translateY(-4px)":"none",
-          boxShadow:hov?"0 12px 32px rgba(0,0,0,0.35)":"none",
+          transform:hov&&!soon?"translateY(-4px)":"none",
+          boxShadow:hov&&!soon?"0 12px 32px rgba(0,0,0,0.35)":"none",
+          opacity:soon?0.65:1,
+          position:"relative",
         }}>
+        {soon&&<div style={{position:"absolute",top:"12px",right:"12px",background:"rgba(100,100,120,0.35)",color:"#888",fontSize:"9px",fontWeight:"800",padding:"2px 8px",borderRadius:"20px",textTransform:"uppercase",letterSpacing:"1px"}}>Coming Soon</div>}
         <div style={{
           fontSize:"28px",
           marginBottom:"12px",
@@ -1603,12 +1608,12 @@ function FeaturesPage({currency,goPage}){
           width:"48px",
           height:"48px",
           borderRadius:"12px",
-          background:hov?"rgba(200,117,51,0.18)":"rgba(255,255,255,0.04)",
-          border:"1px solid "+(hov?"rgba(200,117,51,0.35)":"rgba(255,255,255,0.06)"),
+          background:hov&&!soon?"rgba(200,117,51,0.18)":"rgba(255,255,255,0.04)",
+          border:"1px solid "+(hov&&!soon?"rgba(200,117,51,0.35)":"rgba(255,255,255,0.06)"),
           transition:"all .22s ease",
         }}>{icon}</div>
-        <div style={{fontWeight:"700",fontSize:"14px",color:hov?"#e8ecf4":C.text,marginBottom:"5px",transition:"color .2s"}}>{name}</div>
-        <div style={{fontSize:"12px",color:hov?"#9ca3af":C.dim,lineHeight:1.6,transition:"color .2s"}}>{desc}</div>
+        <div style={{fontWeight:"700",fontSize:"14px",color:soon?"#666":hov?"#e8ecf4":C.text,marginBottom:"5px",transition:"color .2s"}}>{name}</div>
+        <div style={{fontSize:"12px",color:hov&&!soon?"#9ca3af":C.dim,lineHeight:1.6,transition:"color .2s"}}>{desc}</div>
       </div>
     );
   }
@@ -1785,7 +1790,7 @@ function AddonModal({addonId,currency,onClose}){
         <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:"20px",padding:"36px 28px",maxWidth:"400px",width:"100%",border:"1px solid rgba(200,117,51,0.35)",animation:"up .3s ease",textAlign:"center"}}>
           <div style={{fontSize:"48px",marginBottom:"12px"}}>⚡</div>
           <h2 style={{color:C.text,fontWeight:"900",fontSize:"20px",margin:"0 0 8px"}}>Credit Top-Up</h2>
-          <div style={{fontSize:"32px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{sym+price}</div>
+          <div style={{fontSize:"32px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{price}</div>
           <p style={{color:C.mid,fontSize:"13px",lineHeight:1.7,margin:"0 0 20px"}}>15 extra post generations added instantly to your account. Payment processing via Stripe is coming soon.</p>
           <div style={{background:"rgba(200,117,51,0.07)",border:"1px solid rgba(200,117,51,0.2)",borderRadius:"10px",padding:"14px",marginBottom:"20px",fontSize:"12px",color:C.mid,lineHeight:1.6}}>
             Until Stripe is connected, credits reset monthly on the free tier. Pro gives you unlimited generations and removes this limit entirely.
@@ -2155,8 +2160,8 @@ function PricingPage({currency,goPage}){
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(220px,100%),1fr))",gap:"14px",marginBottom:"48px"}}>
         <PlanCard title="Free" price="0" per="forever" planKey="free" features={["5 posts per month","5 post styles","Industry and role targeting","Copy to clipboard","UK and US English"]}/>
-        <PlanCard title="Pro" price={p.pro} per="/month" planKey="pro" badge="Most Popular" highlight={true} features={["Unlimited posts",...PRO_FEAT.map(f=>f.name)]}/>
-        <PlanCard title="Team" price={p.team} per="/month (3 seats)" planKey="team" badge="Best for teams" features={["Everything in Pro",...TEAM_FEAT.map(f=>f.name)]}/>
+        <PlanCard title="Pro" price={p.pro} per="/month" planKey="pro" badge="Most Popular" highlight={true} features={["Unlimited posts",...PRO_FEAT.map(f=>f.soon?{name:f.name,soon:true}:f.name)]}/>
+        <PlanCard title="Team" price={p.team} per="/month (3 seats)" planKey="team" badge="Best for teams" features={["Everything in Pro",...TEAM_FEAT.map(f=>f.soon?{name:f.name,soon:true}:f.name)]}/>
       </div>
       <div style={{marginBottom:"36px"}}>
         <div style={{textAlign:"center",marginBottom:"20px"}}>
