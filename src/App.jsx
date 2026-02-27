@@ -2073,11 +2073,17 @@ function PricingPage({currency,goPage}){
         <div style={{fontSize:"38px",fontWeight:"900",lineHeight:1,background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{p.sym+price}</div>
         <div style={{fontSize:"12px",color:C.dim,marginBottom:"16px"}}>{per}</div>
         <div style={{flex:1}}>
-          {features.map(f=>(
-            <div key={f} style={{display:"flex",gap:"7px",fontSize:"13px",color:C.mid,marginBottom:"8px"}}>
-              <span style={{color:C.green,flexShrink:0}}>ok</span><span>{f}</span>
-            </div>
-          ))}
+          {features.map((f,i)=>{
+            const label=typeof f==="string"?f:f.name;
+            const soon=typeof f==="object"&&f.soon;
+            return(
+              <div key={i} style={{display:"flex",gap:"7px",fontSize:"13px",color:soon?"#666":C.mid,marginBottom:"8px",alignItems:"center"}}>
+                <span style={{color:soon?"#555":C.green,flexShrink:0}}>{soon?"◦":"✓"}</span>
+                <span>{label}</span>
+                {soon&&<span style={{fontSize:"9px",background:"rgba(100,100,120,0.3)",color:"#666",padding:"1px 5px",borderRadius:"10px",marginLeft:"2px",whiteSpace:"nowrap"}}>Soon</span>}
+              </div>
+            );
+          })}
         </div>
         <button onClick={()=>planKey!=="free"?setUpgradeModal(planKey):goPage("signup")} className="btn"
           style={{marginTop:"16px",width:"100%",padding:"12px",borderRadius:"8px",
