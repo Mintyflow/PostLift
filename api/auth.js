@@ -1,0 +1,125 @@
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_KEY
+);
+
+// Simple password hashing (use bcrypt in production ideally)
+async function hashPassword(password) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(password + "pl_salt_2026");
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export default async function handler(req, res) {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  if (req.method === "OPTIONS") return res.status(200).end();
+  if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
+
+  const body = typeof req.body === "string" ? JSON.parse(req.body) : req.body;
+  const { action, email, password, name } = body;
+
+  try {
+    if (action === "register") {
+      // Check if user exists
+      const { data: existing } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", email.toLowerCase())
+        .single();
+
+      if (existing) return res.status(400).json({ error: "An account with this email already exists." });
+
+      const password_hash = await hashPassword(password);
+      const monthKey = new Date().toISOString().slice(0, 7);
+
+      const { data: user, error } = await supabase
+        .from("users")
+        .insert({ email: email.toLowerCase(), name, password_hash, plan: "free", posts_used: 0, posts_month: monthKey })
+        .select()
+        .single();
+
+      if (error) return res.status(500).json({ error: error.message });
+
+      return res.status(200).json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan, posts_used: user.posts_used, posts_month: user.posts_month } });
+    }
+
+    if (action === "login") {
+      const password_hash = await hashPassword(password);
+
+      const { data: user, error } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", email.toLowerCase())
+        .eq("password_hash", password_hash)
+        .single();
+
+      if (error || !user) return res.status(401).json({ error: "Incorrect email or password." });
+
+      // Reset monthly counter if new month
+      const monthKey = new Date().toISOString().slice(0, 7);
+      if (user.posts_month !== monthKey) {
+        await supabase.from("users").update({ posts_used: 0, posts_month: monthKey }).eq("id", user.id);
+        user.posts_used = 0;
+        user.posts_month = monthKey;
+      }
+
+      return res.status(200).json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan, posts_used: user.posts_used, posts_month: user.posts_month } });
+    }
+
+    if (action === "increment") {
+      const { userId } = body;
+      const { data: user } = await supabase.from("users").select("posts_used, posts_month").eq("id", userId).single();
+      if (!user) return res.status(404).json({ error: "User not found" });
+
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const newCount = user.posts_month === monthKey ? user.posts_used + 1 : 1;
+
+      await supabase.from("users").update({ posts_used: newCount, posts_month: monthKey }).eq("id", userId);
+      return res.status(200).json({ posts_used: newCount });
+    }
+
+    if (action === "upgrade") {
+      const { userId, plan } = body;
+      await supabase.from("users").update({ plan }).eq("id", userId);
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === "save_post") {
+      const { userId, style, content, topic } = body;
+      const { data, error } = await supabase.from("saved_posts").insert({ user_id: userId, style, content, topic }).select().single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ post: data });
+    }
+
+    if (action === "get_posts") {
+      const { userId } = body;
+      const { data, error } = await supabase.from("saved_posts").select("*").eq("user_id", userId).order("created_at", { ascending: false });
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ posts: data });
+    }
+
+    if (action === "delete_post") {
+      const { postId } = body;
+      await supabase.from("saved_posts").delete().eq("id", postId);
+      return res.status(200).json({ success: true });
+    }
+
+    if (action === "forgot_password") {
+      const { data: user } = await supabase.from("users").select("id").eq("email", email.toLowerCase()).single();
+      if (!user) return res.status(200).json({ message: "If that email exists, a reset link has been sent." });
+      // For now just return success - email system needed for real reset
+      return res.status(200).json({ message: "If that email exists, a reset link has been sent." });
+    }
+
+    return res.status(400).json({ error: "Unknown action" });
+
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+}
