@@ -2070,7 +2070,7 @@ function PricingPage({currency,goPage}){
       <div className="card" style={{background:C.card,border:(highlight?"2":"1")+"px solid "+(highlight?C.amber:C.border),borderRadius:"16px",padding:"24px 20px",position:"relative",display:"flex",flexDirection:"column"}}>
         {badge&&<div style={{position:"absolute",top:"12px",right:"12px",background:GRAD_AMBER,color:"#fff",fontSize:"10px",fontWeight:"700",padding:"3px 9px",borderRadius:"20px"}}>{badge}</div>}
         <div style={{fontSize:"17px",fontWeight:"800",marginBottom:"4px",color:C.text}}>{title}</div>
-        <div style={{fontSize:"38px",fontWeight:"900",lineHeight:1,background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{p.sym+price}</div>
+        <div style={{fontSize:"38px",fontWeight:"900",lineHeight:1,background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{price}</div>
         <div style={{fontSize:"12px",color:C.dim,marginBottom:"16px"}}>{per}</div>
         <div style={{flex:1}}>
           {features.map((f,i)=>{
