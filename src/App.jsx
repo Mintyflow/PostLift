@@ -1336,13 +1336,13 @@ function PostUpsellPanel({isPaid,rem,currency,upsellAddon,showUpsell,onDismissUp
             <div style={{fontSize:"12px",color:C.mid,lineHeight:1.5}}>
               {isOut
                 ?"Upgrade to Pro for unlimited posts, the scheduler, analytics, and all add-on tools."
-                :"Upgrade to Pro for unlimited generations and all "+PRO_FEAT.length+" premium features — "+p.sym+p.pro+"/month."}
+                :"Upgrade to Pro for unlimited generations and all "+PRO_FEAT.length+" premium features — "+p.pro+"/month."}
             </div>
           </div>
           <div style={{display:"flex",flexDirection:"column",gap:"7px",flexShrink:0,minWidth:"160px"}}>
             <button onClick={onUpgrade} className="btn"
               style={{padding:"11px 20px",borderRadius:"9px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"13px",cursor:"pointer",textAlign:"center",whiteSpace:"nowrap"}}>
-              {"Upgrade to Pro — "+p.sym+p.pro+"/mo"}
+              {"Upgrade to Pro — "+p.pro+"/mo"}
             </button>
             <button onClick={()=>goPage("pricing")} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"11px",textAlign:"center"}}>
               See all plans including Team
@@ -1645,17 +1645,17 @@ function FeaturesPage({currency,goPage}){
         <p style={{color:C.mid,fontSize:"14px",margin:"0 0 20px"}}>Upgrade to unlock tools that save hours every week</p>
         <button onClick={()=>goPage("pricing")} className="btn" style={{padding:"11px 24px",borderRadius:"9px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"13px",cursor:"pointer"}}>See Pricing</button>
       </div>
-      <div style={{fontSize:"14px",fontWeight:"800",color:C.amber,marginBottom:"14px"}}>{"Pro - "+p.sym+p.pro+"/month"}</div>
+      <div style={{fontSize:"14px",fontWeight:"800",color:C.amber,marginBottom:"14px"}}>{"Pro — "+p.pro+"/month"}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(170px,100%),1fr))",gap:"10px",marginBottom:"32px"}}>
         {PRO_FEAT.map(f=><FCard key={f.name} {...f}/>)}
       </div>
-      <div style={{fontSize:"14px",fontWeight:"800",color:C.amberL,marginBottom:"14px"}}>{"Team - "+p.sym+p.team+"/month"}</div>
+      <div style={{fontSize:"14px",fontWeight:"800",color:C.amberL,marginBottom:"14px"}}>{"Team — "+p.team+"/month"}</div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(170px,100%),1fr))",gap:"10px",marginBottom:"32px"}}>
         {TEAM_FEAT.map(f=><FCard key={f.name} {...f}/>)}
       </div>
       <div style={{background:"rgba(230,125,50,0.04)",border:"1px solid rgba(230,125,50,0.2)",borderRadius:"16px",padding:"28px",textAlign:"center"}}>
         <h3 style={{color:C.text,fontWeight:"900",fontSize:"20px",margin:"0 0 8px"}}>Ready to unlock everything?</h3>
-        <p style={{color:C.mid,fontSize:"13px",margin:"0 0 18px"}}>Join 2,941 professionals already using PostLift Pro.</p>
+        <p style={{color:C.mid,fontSize:"13px",margin:"0 0 18px"}}>Start generating better LinkedIn posts today.</p>
         <button onClick={()=>goPage("pricing")} className="btn" style={{padding:"12px 28px",borderRadius:"9px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer"}}>View Plans</button>
       </div>
     </div>
@@ -1812,7 +1812,7 @@ function AddonModal({addonId,currency,onClose}){
           <div style={{fontSize:"48px",marginBottom:"12px"}}>⚡</div>
           <h2 style={{color:C.text,fontWeight:"900",fontSize:"20px",margin:"0 0 8px"}}>Credit Top-Up</h2>
           <div style={{fontSize:"32px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{price}</div>
-          <p style={{color:C.mid,fontSize:"13px",lineHeight:1.7,margin:"0 0 20px"}}>15 extra post generations added instantly to your account. Payment processing via Stripe is coming soon.</p>
+          <p style={{color:C.mid,fontSize:"13px",lineHeight:1.7,margin:"0 0 20px"}}>15 extra post generations added instantly to your account. Available to Pro and Team subscribers.</p>
           <div style={{background:"rgba(200,117,51,0.07)",border:"1px solid rgba(200,117,51,0.2)",borderRadius:"10px",padding:"14px",marginBottom:"20px",fontSize:"12px",color:C.mid,lineHeight:1.6}}>
             Until Stripe is connected, credits reset monthly on the free tier. Pro gives you unlimited generations and removes this limit entirely.
           </div>
@@ -1875,7 +1875,7 @@ function AddonModal({addonId,currency,onClose}){
 
         {(()=>{const lim=checkAddonLimit(addonId);return(
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",background:"rgba(200,117,51,0.06)",border:"1px solid rgba(200,117,51,0.15)",borderRadius:"9px",padding:"10px 14px",fontSize:"12px",marginBottom:"20px",flexWrap:"wrap"}}>
-            <span style={{color:C.mid,lineHeight:1.5}}>Payment gating via Stripe coming soon. Real AI output generated live.</span>
+            <span style={{color:C.mid,lineHeight:1.5}}>Real AI output generated live for Pro and Team subscribers.</span>
             <span style={{color:lim.used>=lim.limit-1?C.amber:C.green,fontWeight:"700",whiteSpace:"nowrap",flexShrink:0}}>{(lim.limit-lim.used)+" uses left today"}</span>
           </div>
         );})()}
@@ -2068,7 +2068,7 @@ function ManageSeatsModal({onClose,currency}){
           <div style={{fontSize:"11px",color:C.dim,marginBottom:"10px",lineHeight:1.6}}>
             {"Need more than "+totalSeats+" seats? Add extra seats at "+sym+extraPrice+"/seat/month. Each seat gets its own login — no sharing required."}
           </div>
-          <button onClick={()=>{ alert("Extra seat purchasing via Stripe coming soon. Email apps@marvanova.com to add seats manually in the meantime."); }}
+          <button onClick={()=>{ alert("To add extra seats, please email apps@marvanova.com and we will get you set up within 24 hours."); }}
             style={{width:"100%",padding:"11px",borderRadius:"9px",border:"1px solid "+C.amber,background:"transparent",color:C.amber,fontWeight:"700",fontSize:"13px",cursor:"pointer"}}>
             {"Add extra seats — "+sym+extraPrice+"/seat/month"}
           </button>
@@ -2086,6 +2086,11 @@ function ManageSeatsModal({onClose,currency}){
 function PricingPage({currency,goPage}){
   const p=PRICING[currency];
   const [upgradeModal,setUpgradeModal]=useState(null);
+  const [annual,setAnnual]=useState(false);
+  const proPrice=annual?(currency==="GBP"?"£12":"$15"):(p.pro);
+  const teamPrice=annual?(currency==="GBP"?"£32":"$39"):(p.team);
+  const proPer=annual?"/month, billed annually":"/month";
+  const teamPer=annual?"/month, billed annually (3 seats)":"/month (3 seats)";
   function PlanCard({title,price,per,features,highlight,badge,planKey}){
     return(
       <div className="card" style={{background:C.card,border:(highlight?"2":"1")+"px solid "+(highlight?C.amber:C.border),borderRadius:"16px",padding:"24px 20px",position:"relative",display:"flex",flexDirection:"column"}}>
@@ -2180,15 +2185,19 @@ function PricingPage({currency,goPage}){
       <div style={{textAlign:"center",padding:"36px 0 28px"}}>
         <h2 style={{fontSize:"clamp(20px,4vw,36px)",fontWeight:"900",color:C.text,margin:"0 0 6px"}}>Simple, transparent pricing</h2>
         <p style={{color:C.mid,fontSize:"14px",margin:"0 0 12px"}}>Start free. Upgrade when ready.</p>
-        <div style={{display:"inline-flex",alignItems:"center",gap:"8px",background:"rgba(34,197,94,0.08)",border:"1px solid rgba(34,197,94,0.25)",borderRadius:"20px",padding:"6px 16px",fontSize:"12px",color:"#22c55e",fontWeight:"700",marginBottom:"6px"}}>
-          Save 20% with annual Pro — just {currency==="GBP"?"£144":"$182"}/year
+        <div style={{display:"inline-flex",alignItems:"center",gap:"12px",background:C.card,border:"1px solid "+C.border,borderRadius:"30px",padding:"6px 8px 6px 16px",marginBottom:"6px"}}>
+          <span style={{fontSize:"13px",color:annual?C.dim:C.text,fontWeight:"700"}}>Monthly</span>
+          <div onClick={()=>setAnnual(a=>!a)} style={{width:"44px",height:"24px",borderRadius:"12px",background:annual?C.amber:"rgba(255,255,255,0.1)",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+            <div style={{position:"absolute",top:"3px",left:annual?"23px":"3px",width:"18px",height:"18px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+          </div>
+          <span style={{fontSize:"13px",color:annual?C.text:C.dim,fontWeight:"700"}}>Annual <span style={{color:"#22c55e",fontSize:"11px"}}>Save 20%</span></span>
         </div>
         <div style={{fontSize:"11px",color:C.dim}}>Secure payments by Stripe</div>
       </div>
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(220px,100%),1fr))",gap:"14px",marginBottom:"48px"}}>
         <PlanCard title="Free" price="0" per="forever" planKey="free" features={["5 posts per month","5 post styles","Industry and role targeting","Copy to clipboard","UK and US English"]}/>
-        <PlanCard title="Pro" price={p.pro} per="/month" planKey="pro" badge="Most Popular" highlight={true} features={["Unlimited posts",...PRO_FEAT.map(f=>f.soon?{name:f.name,soon:true}:f.name)]}/>
-        <PlanCard title="Team" price={p.team} per="/month (3 seats)" planKey="team" badge="Best for teams" features={["Everything in Pro",...TEAM_FEAT.map(f=>f.soon?{name:f.name,soon:true}:f.name)]}/>
+        <PlanCard title="Pro" price={proPrice} per={proPer} planKey="pro" badge="Most Popular" highlight={true} features={["Unlimited posts",...PRO_FEAT.map(f=>f.soon?{name:f.name,soon:true}:f.name)]}/>
+        <PlanCard title="Team" price={teamPrice} per={teamPer} planKey="team" badge="Best for teams" features={["Everything in Pro",...TEAM_FEAT.map(f=>f.soon?{name:f.name,soon:true}:f.name)]}/>
       </div>
       <div style={{marginBottom:"36px"}}>
         <div style={{textAlign:"center",marginBottom:"20px"}}>
@@ -2470,7 +2479,7 @@ function LegalShell({title,children}){
 }
 function H2({c}){ return <h2 style={{color:C.text,fontWeight:"800",fontSize:"15px",marginTop:"22px",marginBottom:"7px"}}>{c}</h2>; }
 function Pp({c}){ return <p style={{margin:"0 0 10px",color:C.mid,fontSize:"13px",lineHeight:1.75}}>{c}</p>; }
-function Note({c}){ return <div style={{background:"rgba(230,125,50,0.06)",border:"1px solid rgba(230,125,50,0.2)",borderRadius:"7px",padding:"8px 12px",margin:"8px 0",fontSize:"11px",color:C.amber}}><strong>Verify: </strong>{c}</div>; }
+function Note({c}){ return null; }
 function PrivacyPage(){
   return(<LegalShell title="Privacy Policy"><Pp c="This Privacy Policy explains how Marvanova collects and protects your personal data when you use PostLift. We comply with UK GDPR and the Data Protection Act 2018."/><H2 c="1. Who We Are"/><Pp c="PostLift is a product of Marvanova, Sevenoaks, Kent, UK. Contact: apps@marvanova.com"/><Note c="Add registered company number if/when Marvanova incorporates."/><H2 c="2. Data We Collect"/><Pp c="Account data (name, email, hashed password) for registered users. Topics you enter are sent to the Anthropic API to generate posts and are not stored by us long-term. Stripe handles all payment data."/><H2 c="3. How We Use Your Data"/><Pp c="To provide the service; authenticate your account; process payments via Stripe; improve the product. No marketing without opt-in."/><H2 c="4. AI Processing"/><Pp c="Post content you generate is processed by the Anthropic Claude API. Please review Anthropic privacy policy at anthropic.com/privacy."/><H2 c="5. Your Rights (UK GDPR)"/><Pp c="Access, correct, delete, restrict or port your data. Email apps@marvanova.com. We respond within 30 days. Escalate to ICO at ico.org.uk."/><Note c="Register with ICO as a data controller. Around 40-60 pounds per year."/></LegalShell>);
 }
@@ -2970,6 +2979,14 @@ function CookieBanner({onAccept,onDecline}){
 
 function AppInner(){
   const [page,setPage]=useState("home");
+  const [installPrompt,setInstallPrompt]=useState(null);
+  const [showInstall,setShowInstall]=useState(false);
+  useEffect(()=>{
+    const handler=(e)=>{ e.preventDefault(); setInstallPrompt(e); setShowInstall(true); };
+    window.addEventListener("beforeinstallprompt",handler);
+    return ()=>window.removeEventListener("beforeinstallprompt",handler);
+  },[]);
+  async function doInstall(){ if(installPrompt){ await installPrompt.prompt(); setShowInstall(false); } }
   // Handle Stripe success/cancel redirect
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
@@ -3013,6 +3030,15 @@ function AppInner(){
   const isAuthPage=page==="login"||page==="signup";
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:C.text}}>
+      {showInstall&&<div style={{position:"fixed",bottom:"80px",left:"50%",transform:"translateX(-50%)",zIndex:9999,background:C.card,border:"1px solid "+C.amber,borderRadius:"14px",padding:"14px 18px",display:"flex",alignItems:"center",gap:"12px",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",maxWidth:"340px",width:"90%"}}>
+        <span style={{fontSize:"28px"}}>📱</span>
+        <div style={{flex:1}}>
+          <div style={{color:C.text,fontWeight:"700",fontSize:"13px"}}>Add PostLift to your home screen</div>
+          <div style={{color:C.dim,fontSize:"11px"}}>Access it like an app, offline-ready</div>
+        </div>
+        <button onClick={doInstall} style={{background:GRAD_AMBER,color:"#fff",border:"none",borderRadius:"8px",padding:"7px 12px",fontWeight:"700",fontSize:"12px",cursor:"pointer"}}>Install</button>
+        <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:C.dim,fontSize:"18px",cursor:"pointer",padding:"0 4px"}}>×</button>
+      </div>}
       {isAuthPage
         ?<AuthPage mode={page} goPage={goPage}/>
         :<>
