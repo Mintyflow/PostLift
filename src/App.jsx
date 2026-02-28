@@ -2922,6 +2922,216 @@ function MyPostsPage({goPage}){
   );
 }
 
+
+function AdminPage(){
+  const [password,setPassword]=useState("");
+  const [authed,setAuthed]=useState(false);
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [data,setData]=useState(null);
+  const [changingPlan,setChangingPlan]=useState(null);
+  const [confirmDel,setConfirmDel]=useState(null);
+  const [search,setSearch]=useState("");
+  const [filter,setFilter]=useState("all");
+
+  async function login(){
+    setLoading(true); setErr("");
+    try{
+      const res=await fetch("/api/admin",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"get_stats",password})});
+      const d=await res.json();
+      if(d.error){ setErr(d.error); setLoading(false); return; }
+      setData(d); setAuthed(true); setLoading(false);
+    }catch(e){ setErr("Could not connect."); setLoading(false); }
+  }
+
+  async function refresh(){
+    setLoading(true);
+    try{
+      const res=await fetch("/api/admin",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"get_stats",password})});
+      const d=await res.json();
+      if(!d.error) setData(d);
+      setLoading(false);
+    }catch(e){ setLoading(false); }
+  }
+
+  async function updatePlan(userId,plan){
+    await fetch("/api/admin",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"update_plan",password,userId,plan})});
+    setChangingPlan(null);
+    refresh();
+  }
+
+  async function deleteUser(userId){
+    await fetch("/api/admin",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({action:"delete_user",password,userId})});
+    setConfirmDel(null);
+    refresh();
+  }
+
+  if(!authed) return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+      <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:"16px",padding:"36px",width:"100%",maxWidth:"360px"}}>
+        <div style={{textAlign:"center",marginBottom:"24px"}}>
+          <div style={{fontSize:"36px",marginBottom:"8px"}}>🔐</div>
+          <h2 style={{color:C.text,fontWeight:"900",margin:"0 0 4px"}}>Admin Access</h2>
+          <p style={{color:C.dim,fontSize:"13px",margin:0}}>PostLift dashboard</p>
+        </div>
+        <input type="password" placeholder="Admin password" value={password}
+          onChange={e=>setPassword(e.target.value)}
+          onKeyDown={e=>e.key==="Enter"&&login()}
+          style={{width:"100%",padding:"11px 14px",borderRadius:"8px",border:"1px solid "+C.border,
+            background:"rgba(255,255,255,0.05)",color:C.text,fontSize:"14px",marginBottom:"12px",boxSizing:"border-box"}}/>
+        {err&&<div style={{color:"#f87171",fontSize:"12px",marginBottom:"10px"}}>{err}</div>}
+        <button onClick={login} disabled={loading} style={{width:"100%",padding:"12px",borderRadius:"8px",
+          border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer"}}>
+          {loading?"Checking...":"Enter Dashboard"}
+        </button>
+      </div>
+    </div>
+  );
+
+  const {stats,users=[]}=data||{};
+  const filtered=users.filter(u=>{
+    const matchSearch=!search.trim()||(u.email+u.name).toLowerCase().includes(search.toLowerCase());
+    const matchFilter=filter==="all"||u.plan===filter;
+    return matchSearch&&matchFilter;
+  });
+
+  const planColor={free:C.dim,pro:C.amber,team:"#a78bfa"};
+  const planBg={free:"rgba(255,255,255,0.05)",pro:"rgba(200,117,51,0.15)",team:"rgba(167,139,250,0.15)"};
+
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,padding:"24px 16px",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+      <div style={{maxWidth:"1100px",margin:"0 auto"}}>
+
+        {/* Header */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"28px",flexWrap:"wrap",gap:"12px"}}>
+          <div>
+            <h1 style={{color:C.text,fontWeight:"900",fontSize:"24px",margin:"0 0 2px"}}>PostLift Admin</h1>
+            <p style={{color:C.dim,fontSize:"12px",margin:0}}>Welcome back, Marvin</p>
+          </div>
+          <button onClick={refresh} style={{padding:"8px 16px",borderRadius:"8px",border:"1px solid "+C.border,
+            background:"transparent",color:C.mid,fontSize:"12px",cursor:"pointer",fontWeight:"700"}}>
+            {loading?"Refreshing...":"⟳ Refresh"}
+          </button>
+        </div>
+
+        {/* Stats cards */}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:"12px",marginBottom:"28px"}}>
+          {[
+            {label:"Total Users",value:stats?.total||0,icon:"👥"},
+            {label:"Free Users",value:stats?.free||0,icon:"🆓"},
+            {label:"Pro Users",value:stats?.pro||0,icon:"⭐"},
+            {label:"Team Users",value:stats?.team||0,icon:"👑"},
+            {label:"Saved Posts",value:stats?.totalPosts||0,icon:"📝"},
+            {label:"MRR (GBP)",value:"£"+(stats?.mrrGBP||0),icon:"💰"},
+            {label:"MRR (USD)",value:"$"+(stats?.mrrUSD||0),icon:"💵"},
+          ].map(s=>(
+            <div key={s.label} style={{background:C.card,border:"1px solid "+C.border,borderRadius:"12px",padding:"16px"}}>
+              <div style={{fontSize:"22px",marginBottom:"6px"}}>{s.icon}</div>
+              <div style={{fontSize:"22px",fontWeight:"900",color:C.text}}>{s.value}</div>
+              <div style={{fontSize:"11px",color:C.dim}}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Search and filter */}
+        <div style={{display:"flex",gap:"10px",marginBottom:"16px",flexWrap:"wrap"}}>
+          <input placeholder="Search by name or email..." value={search} onChange={e=>setSearch(e.target.value)}
+            style={{flex:1,minWidth:"200px",padding:"9px 14px",borderRadius:"8px",border:"1px solid "+C.border,
+              background:"rgba(255,255,255,0.05)",color:C.text,fontSize:"13px"}}/>
+          {["all","free","pro","team"].map(f=>(
+            <button key={f} onClick={()=>setFilter(f)}
+              style={{padding:"9px 16px",borderRadius:"8px",border:"1px solid "+(filter===f?C.amber:C.border),
+                background:filter===f?"rgba(200,117,51,0.15)":"transparent",
+                color:filter===f?C.amber:C.dim,fontWeight:"700",fontSize:"12px",cursor:"pointer",textTransform:"capitalize"}}>
+              {f==="all"?"All Plans":f.charAt(0).toUpperCase()+f.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        {/* Users table */}
+        <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:"14px",overflow:"hidden"}}>
+          <div style={{overflowX:"auto"}}>
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{borderBottom:"1px solid "+C.border}}>
+                  {["Name","Email","Plan","Posts Used","Joined","Actions"].map(h=>(
+                    <th key={h} style={{padding:"12px 16px",textAlign:"left",fontSize:"11px",
+                      color:C.dim,fontWeight:"700",textTransform:"uppercase",letterSpacing:"0.5px",whiteSpace:"nowrap"}}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((u,i)=>(
+                  <tr key={u.id} style={{borderBottom:i<filtered.length-1?"1px solid "+C.border:"none",
+                    background:i%2===0?"transparent":"rgba(255,255,255,0.01)"}}>
+                    <td style={{padding:"12px 16px",color:C.text,fontSize:"13px",fontWeight:"600",whiteSpace:"nowrap"}}>{u.name}</td>
+                    <td style={{padding:"12px 16px",color:C.mid,fontSize:"12px"}}>{u.email}</td>
+                    <td style={{padding:"12px 16px"}}>
+                      {changingPlan===u.id?(
+                        <div style={{display:"flex",gap:"4px"}}>
+                          {["free","pro","team"].map(pl=>(
+                            <button key={pl} onClick={()=>updatePlan(u.id,pl)}
+                              style={{padding:"4px 8px",borderRadius:"6px",border:"1px solid "+C.border,
+                                background:u.plan===pl?"rgba(200,117,51,0.2)":"transparent",
+                                color:u.plan===pl?C.amber:C.dim,fontSize:"11px",cursor:"pointer",fontWeight:"700",textTransform:"capitalize"}}>
+                              {pl}
+                            </button>
+                          ))}
+                          <button onClick={()=>setChangingPlan(null)}
+                            style={{padding:"4px 8px",borderRadius:"6px",border:"none",background:"transparent",color:C.dim,cursor:"pointer"}}>✕</button>
+                        </div>
+                      ):(
+                        <span onClick={()=>setChangingPlan(u.id)}
+                          style={{display:"inline-block",padding:"3px 10px",borderRadius:"20px",fontSize:"11px",fontWeight:"700",
+                            background:planBg[u.plan]||planBg.free,color:planColor[u.plan]||planColor.free,
+                            cursor:"pointer",textTransform:"capitalize",border:"1px solid "+(planColor[u.plan]||planColor.free)+"44"}}>
+                          {u.plan}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{padding:"12px 16px",color:C.mid,fontSize:"13px"}}>{u.posts_used||0}</td>
+                    <td style={{padding:"12px 16px",color:C.dim,fontSize:"12px",whiteSpace:"nowrap"}}>
+                      {new Date(u.created_at).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"})}
+                    </td>
+                    <td style={{padding:"12px 16px"}}>
+                      {confirmDel===u.id?(
+                        <div style={{display:"flex",gap:"6px",alignItems:"center"}}>
+                          <span style={{color:"#f87171",fontSize:"11px"}}>Sure?</span>
+                          <button onClick={()=>deleteUser(u.id)}
+                            style={{padding:"3px 8px",borderRadius:"6px",border:"none",background:"rgba(248,113,113,0.2)",
+                              color:"#f87171",fontSize:"11px",cursor:"pointer",fontWeight:"700"}}>Delete</button>
+                          <button onClick={()=>setConfirmDel(null)}
+                            style={{padding:"3px 8px",borderRadius:"6px",border:"none",background:"transparent",color:C.dim,cursor:"pointer"}}>Cancel</button>
+                        </div>
+                      ):(
+                        <button onClick={()=>setConfirmDel(u.id)}
+                          style={{padding:"4px 10px",borderRadius:"6px",border:"1px solid rgba(248,113,113,0.3)",
+                            background:"transparent",color:"#f87171",fontSize:"11px",cursor:"pointer",fontWeight:"700"}}>
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length===0&&(
+                  <tr><td colSpan={6} style={{padding:"32px",textAlign:"center",color:C.dim,fontSize:"13px"}}>No users found</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div style={{textAlign:"center",marginTop:"12px",color:C.dim,fontSize:"11px"}}>
+          Showing {filtered.length} of {users.length} users
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Footer({goPage}){
   const yr=new Date().getFullYear();
   function Lnk({pg,lbl}){ return <div style={{marginBottom:"6px"}}><button onClick={()=>goPage(pg)} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px",padding:"2px 0",transition:"color .2s"}} onMouseEnter={e=>e.target.style.color=C.amber} onMouseLeave={e=>e.target.style.color=C.dim}>{lbl}</button></div>; }
@@ -3054,6 +3264,7 @@ function AppInner(){
             {page==="privacy"   &&<PrivacyPage/>}
             {page==="cookies"   &&<CookiePolicyPage/>}
             {page==="terms"     &&<TermsPage/>}
+            {page==="admin"     &&<AdminPage/>}
           </main>
           <div style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px"}}>
             <EmailCaptureInline source="above-footer"/>
