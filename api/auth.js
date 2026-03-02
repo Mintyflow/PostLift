@@ -46,11 +46,17 @@ export default async function handler(req, res) {
 
       if (error) return res.status(500).json({ error: error.message });
 
-      // Send welcome email (fire and forget)
-      fetch(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}/api/emails` : "http://localhost:3000/api/emails", {
+      // Send welcome email + admin notification (fire and forget)
+      const baseUrl = "https://trypostlift.com";
+      fetch(`${baseUrl}/api/emails`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
         body: JSON.stringify({ action: "welcome", name: user.name, email: user.email })
+      }).catch(() => {});
+      fetch(`${baseUrl}/api/emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
+        body: JSON.stringify({ action: "admin_notify", event: "signup", name: user.name, email: user.email, plan: "free" })
       }).catch(() => {});
 
       return res.status(200).json({ user: { id: user.id, email: user.email, name: user.name, plan: user.plan, posts_used: user.posts_used, posts_month: user.posts_month } });
