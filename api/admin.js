@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_KEY
 );
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "postlift-admin-2026";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "J@ckson1979";
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
