@@ -155,6 +155,33 @@ export async function sendWeeklyStatsEmail(stats) {
   return sendEmail(ADMIN_EMAIL, subject, html);
 }
 
+export async function sendAdminNotification(event, name, email, plan) {
+  const icons = { signup: "👤", upgrade: "💰", cancel: "😢" };
+  const titles = { signup: "New signup!", upgrade: "New paid subscriber!", cancel: "Cancellation" };
+  const colors = { signup: "#22c55e", upgrade: "#c87533", cancel: "#f87171" };
+  const icon = icons[event] || "📬";
+  const title = titles[event] || "PostLift Update";
+  const color = colors[event] || "#c87533";
+  
+  const subject = `${icon} ${title} — ${name}`;
+  const html = baseTemplate(`
+    <h1 style="color:${color}">${icon} ${title}</h1>
+    <div class="stat">
+      <div>
+        <div style="font-size:16px;font-weight:800;color:#e8ecf4">${name}</div>
+        <div class="stat-lbl">${email}</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:14px;font-weight:700;color:${color};text-transform:capitalize">${plan} plan</div>
+        <div class="stat-lbl">${new Date().toLocaleString("en-GB")}</div>
+      </div>
+    </div>
+    ${event === "upgrade" ? `<p style="color:#22c55e;font-weight:700">💰 New recurring revenue added!</p>` : ""}
+    <a href="${BASE_URL}/admin" class="btn" style="background:${color}">View Admin Dashboard →</a>
+  `);
+  return sendEmail(ADMIN_EMAIL, subject, html);
+}
+
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -175,6 +202,11 @@ export default async function handler(req, res) {
     if (action === "day7") { await sendDay7Email(name, email); return res.status(200).json({ ok: true }); }
     if (action === "reengage") { await sendReEngagementEmail(name, email); return res.status(200).json({ ok: true }); }
     if (action === "weekly_stats") { await sendWeeklyStatsEmail(stats); return res.status(200).json({ ok: true }); }
+    if (action === "admin_notify") { 
+      const { event, plan } = body;
+      await sendAdminNotification(event, name, email, plan); 
+      return res.status(200).json({ ok: true }); 
+    }
     return res.status(400).json({ error: "Unknown action" });
   } catch (err) {
     return res.status(500).json({ error: err.message });
