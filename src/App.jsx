@@ -1,7 +1,15 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 // ─── ANTHROPIC API KEY — loaded securely from Vercel environment variables ───
 const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_KEY || "";
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── SUPABASE CLIENT ────────────────────────────────────────────────────────
+const supabase = createClient(
+  "https://vgaevitaqaqspwseufeh.supabase.co",
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnYWV2aXRhcWFxc3B3c2V1ZmVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODk0MjUsImV4cCI6MjA4Nzc2NTQyNX0.FrAQhk8us8yP7oItTNjsjjFHH8PrhgYU8Xkn7LXzT1w"
+);
 // ─────────────────────────────────────────────────────────────────────────────
 
 // PostLift Logo
@@ -446,21 +454,50 @@ function useAuth(){ return useContext(AuthCtx); }
 
 function AuthProvider({children}){
   const [user,setUser] = useState(null);
-  const [authLoading,setAuthLoading] = useState(false);
+  const [authLoading,setAuthLoading] = useState(true);
+
+  async function syncProfile(authUser){
+    try{
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"sync_profile",authId:authUser.id,email:authUser.email,name:authUser.user_metadata?.full_name||authUser.user_metadata?.name||authUser.email.split("@")[0]})});
+      const data=await res.json();
+      if(data.user){
+        localStorage.setItem("pl_user",JSON.stringify(data.user));
+        setUser(data.user);
+        return data.user;
+      }
+    }catch(e){}
+    return null;
+  }
 
   useEffect(()=>{
-    try{ const u=localStorage.getItem("pl_user"); if(u) setUser(JSON.parse(u)); }catch(e){}
+    supabase.auth.getSession().then(({data:{session}})=>{
+      if(session?.user){
+        const cached=localStorage.getItem("pl_user");
+        if(cached){ try{ setUser(JSON.parse(cached)); }catch(e){} }
+        syncProfile(session.user);
+      }
+      setAuthLoading(false);
+    });
+    const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
+      if(event==="SIGNED_IN"&&session?.user){
+        await syncProfile(session.user);
+      } else if(event==="SIGNED_OUT"){
+        localStorage.removeItem("pl_user");
+        setUser(null);
+      }
+    });
+    return ()=>subscription.unsubscribe();
   },[]);
 
   async function signup(name,email,password){
     setAuthLoading(true);
     try{
-      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"register",name,email,password})});
-      const data=await res.json();
-      if(data.error){ setAuthLoading(false); return {error:data.error}; }
-      localStorage.setItem("pl_user",JSON.stringify(data.user));
-      setUser(data.user);
+      const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});
+      if(error){ setAuthLoading(false); return {error:error.message}; }
+      if(data.user){
+        await syncProfile({...data.user,user_metadata:{...data.user.user_metadata,full_name:name}});
+      }
       setAuthLoading(false);
       return {ok:true};
     }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
@@ -469,18 +506,22 @@ function AuthProvider({children}){
   async function login(email,password){
     setAuthLoading(true);
     try{
-      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"login",email,password})});
-      const data=await res.json();
-      if(data.error){ setAuthLoading(false); return {error:data.error}; }
-      localStorage.setItem("pl_user",JSON.stringify(data.user));
-      setUser(data.user);
+      const {data,error}=await supabase.auth.signInWithPassword({email,password});
+      if(error){ setAuthLoading(false); return {error:error.message}; }
+      if(data.user) await syncProfile(data.user);
       setAuthLoading(false);
       return {ok:true};
     }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
   }
 
-  function logout(){
+  async function loginWithGoogle(){
+    const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
+    if(error) return {error:error.message};
+    return {ok:true};
+  }
+
+  async function logout(){
+    await supabase.auth.signOut();
     localStorage.removeItem("pl_user");
     setUser(null);
   }
@@ -526,7 +567,7 @@ function AuthProvider({children}){
     }catch(e){}
   }
 
-  return <AuthCtx.Provider value={{user,signup,login,logout,updateUsage,savePost,getSavedPosts,deletePost,authLoading}}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{user,signup,login,loginWithGoogle,logout,updateUsage,savePost,getSavedPosts,deletePost,authLoading}}>{children}</AuthCtx.Provider>;
 }
 
 function buildPrompt(cfg,styleId){
@@ -1078,7 +1119,7 @@ function Nav({page,goPage,currency,toggleCurrency}){
 }
 
 function AuthPage({mode,goPage}){
-  const {signup,login}=useAuth();
+  const {signup,login,loginWithGoogle}=useAuth();
   const isLogin=mode==="login";
   const [name,setName]=useState("");
   const [email,setEmail]=useState("");
@@ -1094,11 +1135,14 @@ function AuthPage({mode,goPage}){
     if(!isLogin&&pass!==confirm) e.confirm="Passwords do not match.";
     if(Object.keys(e).length){ setErr(e); return; }
     setErr({}); setLoading(true);
-    await new Promise(r=>setTimeout(r,600));
-    const res=isLogin?login(email,pass):signup(name,email,pass);
+    const res=await (isLogin?login(email,pass):signup(name,email,pass));
     setLoading(false);
     if(res.error) setErr({general:res.error});
-    else goPage("home");
+  }
+  async function handleGoogle(){
+    setErr({});
+    const res=await loginWithGoogle();
+    if(res.error) setErr({general:res.error});
   }
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
@@ -1112,6 +1156,17 @@ function AuthPage({mode,goPage}){
         </div>
         <div style={{background:C.card,borderRadius:"18px",padding:"28px 24px",border:"1px solid "+C.border}} className="up">
           {err.general&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"8px",padding:"10px 14px",marginBottom:"16px",fontSize:"13px",color:"#fca5a5"}}>{"! "+err.general}</div>}
+          <button onClick={handleGoogle} className="btn"
+            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"10px",width:"100%",padding:"14px",borderRadius:"10px",border:"1px solid "+C.border,
+              background:C.raised,color:C.text,fontWeight:"700",fontSize:"15px",cursor:"pointer",marginBottom:"20px"}}>
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            {isLogin?"Sign in with Google":"Sign up with Google"}
+          </button>
+          <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}}>
+            <div style={{flex:1,height:"1px",background:C.border}}/>
+            <span style={{color:C.dim,fontSize:"12px",fontWeight:"600"}}>or</span>
+            <div style={{flex:1,height:"1px",background:C.border}}/>
+          </div>
           {!isLogin&&<Input label="Full name" value={name} onChange={setName} placeholder="Marvin Campbell" err={err.name}/>}
           <Input label="Email address" value={email} onChange={setEmail} placeholder="you@company.com" type="email" err={err.email}/>
           <Input label="Password" value={pass} onChange={setPass} placeholder="Min 6 characters" type="password" err={err.pass}/>
@@ -1128,9 +1183,6 @@ function AuthPage({mode,goPage}){
           <button onClick={()=>goPage(isLogin?"signup":"login")} style={{background:"none",border:"none",color:C.amber,cursor:"pointer",fontWeight:"700",fontSize:"13px"}}>
             {isLogin?"Sign up free":"Sign in"}
           </button>
-        </div>
-        <div style={{textAlign:"center",marginTop:"10px"}} className="up">
-          <button onClick={()=>goPage("home")} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>Continue without account</button>
         </div>
       </div>
     </div>
@@ -3188,6 +3240,7 @@ function CookieBanner({onAccept,onDecline}){
 }
 
 function AppInner(){
+  const {user,authLoading}=useAuth();
   const [page,setPage]=useState("home");
   const [installPrompt,setInstallPrompt]=useState(null);
   const [showInstall,setShowInstall]=useState(false);
@@ -3237,7 +3290,17 @@ function AppInner(){
   },[]);
   function goPage(p){ setPage(p); try{window.scrollTo(0,0);}catch(e){} }
   function toggleCurrency(){ /* currency is locked to detected location */ }
-  const isAuthPage=page==="login"||page==="signup";
+  if(authLoading){
+    return(
+      <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
+        <Spinner size={28} color={C.amber}/>
+      </div>
+    );
+  }
+  if(!user){
+    const authMode=page==="signup"?"signup":"login";
+    return <AuthPage mode={authMode} goPage={goPage}/>;
+  }
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:C.text}}>
       {showInstall&&<div style={{position:"fixed",bottom:"80px",left:"50%",transform:"translateX(-50%)",zIndex:9999,background:C.card,border:"1px solid "+C.amber,borderRadius:"14px",padding:"14px 18px",display:"flex",alignItems:"center",gap:"12px",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",maxWidth:"340px",width:"90%"}}>
@@ -3249,33 +3312,28 @@ function AppInner(){
         <button onClick={doInstall} style={{background:GRAD_AMBER,color:"#fff",border:"none",borderRadius:"8px",padding:"7px 12px",fontWeight:"700",fontSize:"12px",cursor:"pointer"}}>Install</button>
         <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:C.dim,fontSize:"18px",cursor:"pointer",padding:"0 4px"}}>×</button>
       </div>}
-      {isAuthPage
-        ?<AuthPage mode={page} goPage={goPage}/>
-        :<>
-          <Nav page={page} goPage={goPage} currency={currency} toggleCurrency={toggleCurrency}/>
-          <main style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px 80px"}}>
-            {page==="home"      &&<HomePage      currency={currency} isUK={isUK} goPage={goPage}/>}
-            {page==="features"  &&<FeaturesPage  currency={currency} goPage={goPage}/>}
-            {page==="pricing"   &&<PricingPage   currency={currency} goPage={goPage}/>}
-            {page==="tools"     &&<ToolsPage/>}
-            {page==="myposts"   &&<MyPostsPage   goPage={goPage}/>}
-            {page==="affiliates"&&<AffiliatePage currency={currency} goPage={goPage}/>}
-            {page==="about"     &&<AboutPage/>}
-            {page==="privacy"   &&<PrivacyPage/>}
-            {page==="cookies"   &&<CookiePolicyPage/>}
-            {page==="terms"     &&<TermsPage/>}
-            {page==="admin"     &&<AdminPage/>}
-          </main>
-          <div style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px"}}>
-            <EmailCaptureInline source="above-footer"/>
-          </div>
-          <Footer goPage={goPage}/>
-          {cookies===null&&<CookieBanner
-            onAccept={()=>{setCookies(true);try{localStorage.setItem("pl_cc","true");}catch(e){}}  }
-            onDecline={()=>{setCookies(false);try{localStorage.setItem("pl_cc","false");}catch(e){}}}
-          />}
-        </>
-      }
+      <Nav page={page} goPage={goPage} currency={currency} toggleCurrency={toggleCurrency}/>
+      <main style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px 80px"}}>
+        {page==="home"      &&<HomePage      currency={currency} isUK={isUK} goPage={goPage}/>}
+        {page==="features"  &&<FeaturesPage  currency={currency} goPage={goPage}/>}
+        {page==="pricing"   &&<PricingPage   currency={currency} goPage={goPage}/>}
+        {page==="tools"     &&<ToolsPage/>}
+        {page==="myposts"   &&<MyPostsPage   goPage={goPage}/>}
+        {page==="affiliates"&&<AffiliatePage currency={currency} goPage={goPage}/>}
+        {page==="about"     &&<AboutPage/>}
+        {page==="privacy"   &&<PrivacyPage/>}
+        {page==="cookies"   &&<CookiePolicyPage/>}
+        {page==="terms"     &&<TermsPage/>}
+        {page==="admin"     &&<AdminPage/>}
+      </main>
+      <div style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px"}}>
+        <EmailCaptureInline source="above-footer"/>
+      </div>
+      <Footer goPage={goPage}/>
+      {cookies===null&&<CookieBanner
+        onAccept={()=>{setCookies(true);try{localStorage.setItem("pl_cc","true");}catch(e){}}  }
+        onDecline={()=>{setCookies(false);try{localStorage.setItem("pl_cc","false");}catch(e){}}}
+      />}
     </div>
   );
 }

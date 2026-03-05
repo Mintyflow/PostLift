@@ -123,6 +123,54 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    if (action === "sync_profile") {
+      const { authId, email: syncEmail, name: syncName } = body;
+      const normalEmail = syncEmail.toLowerCase();
+
+      // Check if profile already exists by email
+      const { data: existing } = await supabase
+        .from("users")
+        .select("*")
+        .eq("email", normalEmail)
+        .single();
+
+      if (existing) {
+        // Reset monthly counter if new month
+        const monthKey = new Date().toISOString().slice(0, 7);
+        if (existing.posts_month !== monthKey) {
+          await supabase.from("users").update({ posts_used: 0, posts_month: monthKey }).eq("id", existing.id);
+          existing.posts_used = 0;
+          existing.posts_month = monthKey;
+        }
+        return res.status(200).json({ user: { id: existing.id, email: existing.email, name: existing.name, plan: existing.plan, posts_used: existing.posts_used, posts_month: existing.posts_month } });
+      }
+
+      // Create new profile
+      const monthKey = new Date().toISOString().slice(0, 7);
+      const { data: newUser, error: insertErr } = await supabase
+        .from("users")
+        .insert({ email: normalEmail, name: syncName || normalEmail.split("@")[0], plan: "free", posts_used: 0, posts_month: monthKey })
+        .select()
+        .single();
+
+      if (insertErr) return res.status(500).json({ error: insertErr.message });
+
+      // Send welcome email + admin notification (fire and forget)
+      const baseUrl = "https://trypostlift.com";
+      fetch(`${baseUrl}/api/emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
+        body: JSON.stringify({ action: "welcome", name: newUser.name, email: newUser.email })
+      }).catch(() => {});
+      fetch(`${baseUrl}/api/emails`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
+        body: JSON.stringify({ action: "admin_notify", event: "signup", name: newUser.name, email: newUser.email, plan: "free" })
+      }).catch(() => {});
+
+      return res.status(200).json({ user: { id: newUser.id, email: newUser.email, name: newUser.name, plan: newUser.plan, posts_used: newUser.posts_used, posts_month: newUser.posts_month } });
+    }
+
     if (action === "forgot_password") {
       const { data: user } = await supabase.from("users").select("id").eq("email", email.toLowerCase()).single();
       if (!user) return res.status(200).json({ message: "If that email exists, a reset link has been sent." });
