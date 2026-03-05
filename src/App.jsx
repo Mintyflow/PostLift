@@ -3346,7 +3346,7 @@ function AppInner(){
         {page==="privacy"   &&<PrivacyPage/>}
         {page==="cookies"   &&<CookiePolicyPage/>}
         {page==="terms"     &&<TermsPage/>}
-        {page==="admin"     &&<AdminPage/>}
+        {page==="admin"     &&<div style={{padding:"40px 20px",textAlign:"center"}}><p style={{color:C.mid,fontSize:"14px"}}>Admin dashboard has moved.</p><a href="/admin" style={{color:C.amber,fontWeight:"700"}}>Go to /admin</a></div>}
       </main>
       <div style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px"}}>
         <EmailCaptureInline source="above-footer"/>
