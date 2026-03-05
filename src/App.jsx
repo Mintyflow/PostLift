@@ -471,17 +471,27 @@ function AuthProvider({children}){
   }
 
   useEffect(()=>{
-    supabase.auth.getSession().then(({data:{session}})=>{
+    supabase.auth.getSession().then(async({data:{session}})=>{
       if(session?.user){
         const cached=localStorage.getItem("pl_user");
         if(cached){ try{ setUser(JSON.parse(cached)); }catch(e){} }
-        syncProfile(session.user);
+        const synced=await syncProfile(session.user);
+        if(!synced&&!cached){
+          const fallback={id:session.user.id,email:session.user.email,name:session.user.user_metadata?.full_name||session.user.user_metadata?.name||session.user.email.split("@")[0]};
+          localStorage.setItem("pl_user",JSON.stringify(fallback));
+          setUser(fallback);
+        }
       }
       setAuthLoading(false);
     });
     const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      if(event==="SIGNED_IN"&&session?.user){
-        await syncProfile(session.user);
+      if((event==="SIGNED_IN"||event==="TOKEN_REFRESHED"||event==="INITIAL_SESSION")&&session?.user){
+        const synced=await syncProfile(session.user);
+        if(!synced){
+          const fallback={id:session.user.id,email:session.user.email,name:session.user.user_metadata?.full_name||session.user.user_metadata?.name||session.user.email.split("@")[0]};
+          localStorage.setItem("pl_user",JSON.stringify(fallback));
+          setUser(fallback);
+        }
       } else if(event==="SIGNED_OUT"){
         localStorage.removeItem("pl_user");
         setUser(null);
@@ -496,7 +506,12 @@ function AuthProvider({children}){
       const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});
       if(error){ setAuthLoading(false); return {error:error.message}; }
       if(data.user){
-        await syncProfile({...data.user,user_metadata:{...data.user.user_metadata,full_name:name}});
+        const synced=await syncProfile({...data.user,user_metadata:{...data.user.user_metadata,full_name:name}});
+        if(!synced){
+          const fallback={id:data.user.id,email:data.user.email,name:name||data.user.email.split("@")[0]};
+          localStorage.setItem("pl_user",JSON.stringify(fallback));
+          setUser(fallback);
+        }
       }
       setAuthLoading(false);
       return {ok:true};
@@ -508,7 +523,14 @@ function AuthProvider({children}){
     try{
       const {data,error}=await supabase.auth.signInWithPassword({email,password});
       if(error){ setAuthLoading(false); return {error:error.message}; }
-      if(data.user) await syncProfile(data.user);
+      if(data.user){
+        const synced=await syncProfile(data.user);
+        if(!synced){
+          const fallback={id:data.user.id,email:data.user.email,name:data.user.user_metadata?.full_name||data.user.user_metadata?.name||data.user.email.split("@")[0]};
+          localStorage.setItem("pl_user",JSON.stringify(fallback));
+          setUser(fallback);
+        }
+      }
       setAuthLoading(false);
       return {ok:true};
     }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
