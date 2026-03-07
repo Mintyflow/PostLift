@@ -980,18 +980,15 @@ function UpgradeModal({plan,currency,onClose}){
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
 
-  async function handleCheckout(){
-    setLoading(true); setErr("");
-    try{
-      const res=await fetch("/api/checkout",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({plan:plan.toLowerCase(),currency,email:user?.email||""})
-      });
-      const data=await res.json();
-      if(data.url){ window.location.href=data.url; }
-      else{ setErr(data.error||"Something went wrong. Please try again."); setLoading(false); }
-    }catch(e){ setErr("Could not connect. Please try again."); setLoading(false); }
+  function handleCheckout(){
+    const isUK=currency==="GBP";
+    const links={
+      pro:isUK?"https://buy.stripe.com/6oUaEXafNaVL6x44uWaAw06":"https://buy.stripe.com/aFa28r87Fgg5bRo7H8aAw05",
+      team:isUK?"https://buy.stripe.com/4gM3cvgEb8NDf3A0eGaAw04":"https://buy.stripe.com/8x2fZh87F6FvcVse5waAw03",
+    };
+    const url=links[plan.toLowerCase()];
+    const email=user?.email||"";
+    window.open(url+(email?"?prefilled_email="+encodeURIComponent(email):""),"_blank");
   }
 
   return(
