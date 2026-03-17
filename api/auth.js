@@ -103,6 +103,70 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true });
     }
 
+    // ── Called by Stripe webhook after successful payment ──────────────────
+    if (action === "upgrade_by_email") {
+      const { email: upgradeEmail, plan, stripeCustomerId } = body;
+      if (!upgradeEmail || !plan) return res.status(400).json({ error: "email and plan required" });
+
+      const normalEmail = upgradeEmail.toLowerCase();
+      const updateData = { plan };
+      if (stripeCustomerId) updateData.stripe_customer_id = stripeCustomerId;
+
+      const { data: user, error } = await supabase
+        .from("users")
+        .update(updateData)
+        .eq("email", normalEmail)
+        .select()
+        .single();
+
+      if (error || !user) {
+        // User may not exist yet (paid before creating account) — create them
+        const monthKey = new Date().toISOString().slice(0, 7);
+        const { data: newUser, error: insertErr } = await supabase
+          .from("users")
+          .insert({ email: normalEmail, name: normalEmail.split("@")[0], plan, posts_used: 0, posts_month: monthKey, stripe_customer_id: stripeCustomerId || null })
+          .select()
+          .single();
+        if (insertErr) return res.status(500).json({ error: insertErr.message });
+
+        // Send upgrade notification email
+        fetch("https://trypostlift.com/api/emails", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
+          body: JSON.stringify({ action: "admin_notify", event: "upgrade", email: normalEmail, plan })
+        }).catch(() => {});
+
+        return res.status(200).json({ success: true, user: newUser });
+      }
+
+      // Send upgrade notification email
+      fetch("https://trypostlift.com/api/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
+        body: JSON.stringify({ action: "admin_notify", event: "upgrade", email: normalEmail, plan })
+      }).catch(() => {});
+
+      return res.status(200).json({ success: true, user });
+    }
+
+    // ── Called by Stripe webhook when subscription is cancelled ───────────
+    if (action === "downgrade_by_email") {
+      const { email: downgradeEmail, stripeCustomerId } = body;
+      if (!downgradeEmail) return res.status(400).json({ error: "email required" });
+
+      const normalEmail = downgradeEmail.toLowerCase();
+      await supabase.from("users").update({ plan: "free" }).eq("email", normalEmail);
+
+      // Send cancellation notification email
+      fetch("https://trypostlift.com/api/emails", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-internal-secret": process.env.INTERNAL_SECRET || "pl-internal-2026" },
+        body: JSON.stringify({ action: "admin_notify", event: "cancellation", email: normalEmail })
+      }).catch(() => {});
+
+      return res.status(200).json({ success: true });
+    }
+
     if (action === "save_post") {
       const { userId, style, content, topic } = body;
       const { data, error } = await supabase.from("saved_posts").insert({ user_id: userId, style, content, topic }).select().single();
