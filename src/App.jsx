@@ -1,15 +1,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from "react";
-import { createClient } from "@supabase/supabase-js";
 
 // ─── ANTHROPIC API KEY — loaded securely from Vercel environment variables ───
 const ANTHROPIC_KEY = import.meta.env.VITE_ANTHROPIC_KEY || "";
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─── SUPABASE CLIENT ────────────────────────────────────────────────────────
-const supabase = createClient(
-  "https://vgaevitaqaqspwseufeh.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZnYWV2aXRhcWFxc3B3c2V1ZmVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxODk0MjUsImV4cCI6MjA4Nzc2NTQyNX0.FrAQhk8us8yP7oItTNjsjjFHH8PrhgYU8Xkn7LXzT1w"
-);
 // ─────────────────────────────────────────────────────────────────────────────
 
 // PostLift Logo
@@ -418,7 +410,7 @@ const STYLES = [
 ];
 
 const PRO_FEAT = [
-  {icon:"✏️",name:"Post Improver",desc:"AI rewrites any post on demand"},
+  {icon:"✏️",name:"Post Improver",desc:"AI rewrites any post on demand — try it now in Tools"},
   {icon:"📚",name:"Content Library",desc:"Save, tag and reuse your best posts"},
   {icon:"📅",name:"Post Scheduler",desc:"Queue posts up to 3 months ahead",soon:true},
   {icon:"📊",name:"Performance Analytics",desc:"Track reach, clicks and engagement",soon:true},
@@ -454,65 +446,21 @@ function useAuth(){ return useContext(AuthCtx); }
 
 function AuthProvider({children}){
   const [user,setUser] = useState(null);
-  const [authLoading,setAuthLoading] = useState(true);
-
-  async function syncProfile(authUser){
-    try{
-      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({action:"sync_profile",authId:authUser.id,email:authUser.email,name:authUser.user_metadata?.full_name||authUser.user_metadata?.name||authUser.email.split("@")[0]})});
-      const data=await res.json();
-      if(data.user){
-        localStorage.setItem("pl_user",JSON.stringify(data.user));
-        setUser(data.user);
-        return data.user;
-      }
-    }catch(e){}
-    return null;
-  }
+  const [authLoading,setAuthLoading] = useState(false);
 
   useEffect(()=>{
-    supabase.auth.getSession().then(async({data:{session}})=>{
-      if(session?.user){
-        const cached=localStorage.getItem("pl_user");
-        if(cached){ try{ setUser(JSON.parse(cached)); }catch(e){} }
-        const synced=await syncProfile(session.user);
-        if(!synced&&!cached){
-          const fallback={id:session.user.id,email:session.user.email,name:session.user.user_metadata?.full_name||session.user.user_metadata?.name||session.user.email.split("@")[0]};
-          localStorage.setItem("pl_user",JSON.stringify(fallback));
-          setUser(fallback);
-        }
-      }
-      setAuthLoading(false);
-    });
-    const {data:{subscription}}=supabase.auth.onAuthStateChange(async(event,session)=>{
-      if((event==="SIGNED_IN"||event==="TOKEN_REFRESHED"||event==="INITIAL_SESSION")&&session?.user){
-        const synced=await syncProfile(session.user);
-        if(!synced){
-          const fallback={id:session.user.id,email:session.user.email,name:session.user.user_metadata?.full_name||session.user.user_metadata?.name||session.user.email.split("@")[0]};
-          localStorage.setItem("pl_user",JSON.stringify(fallback));
-          setUser(fallback);
-        }
-      } else if(event==="SIGNED_OUT"){
-        localStorage.removeItem("pl_user");
-        setUser(null);
-      }
-    });
-    return ()=>subscription.unsubscribe();
+    try{ const u=localStorage.getItem("pl_user"); if(u) setUser(JSON.parse(u)); }catch(e){}
   },[]);
 
   async function signup(name,email,password){
     setAuthLoading(true);
     try{
-      const {data,error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name}}});
-      if(error){ setAuthLoading(false); return {error:error.message}; }
-      if(data.user){
-        const synced=await syncProfile({...data.user,user_metadata:{...data.user.user_metadata,full_name:name}});
-        if(!synced){
-          const fallback={id:data.user.id,email:data.user.email,name:name||data.user.email.split("@")[0]};
-          localStorage.setItem("pl_user",JSON.stringify(fallback));
-          setUser(fallback);
-        }
-      }
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"register",name,email,password})});
+      const data=await res.json();
+      if(data.error){ setAuthLoading(false); return {error:data.error}; }
+      localStorage.setItem("pl_user",JSON.stringify(data.user));
+      setUser(data.user);
       setAuthLoading(false);
       return {ok:true};
     }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
@@ -521,29 +469,18 @@ function AuthProvider({children}){
   async function login(email,password){
     setAuthLoading(true);
     try{
-      const {data,error}=await supabase.auth.signInWithPassword({email,password});
-      if(error){ setAuthLoading(false); return {error:error.message}; }
-      if(data.user){
-        const synced=await syncProfile(data.user);
-        if(!synced){
-          const fallback={id:data.user.id,email:data.user.email,name:data.user.user_metadata?.full_name||data.user.user_metadata?.name||data.user.email.split("@")[0]};
-          localStorage.setItem("pl_user",JSON.stringify(fallback));
-          setUser(fallback);
-        }
-      }
+      const res=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({action:"login",email,password})});
+      const data=await res.json();
+      if(data.error){ setAuthLoading(false); return {error:data.error}; }
+      localStorage.setItem("pl_user",JSON.stringify(data.user));
+      setUser(data.user);
       setAuthLoading(false);
       return {ok:true};
     }catch(e){ setAuthLoading(false); return {error:"Could not connect. Please try again."}; }
   }
 
-  async function loginWithGoogle(){
-    const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{redirectTo:window.location.origin}});
-    if(error) return {error:error.message};
-    return {ok:true};
-  }
-
-  async function logout(){
-    await supabase.auth.signOut();
+  function logout(){
     localStorage.removeItem("pl_user");
     setUser(null);
   }
@@ -589,7 +526,7 @@ function AuthProvider({children}){
     }catch(e){}
   }
 
-  return <AuthCtx.Provider value={{user,signup,login,loginWithGoogle,logout,updateUsage,savePost,getSavedPosts,deletePost,authLoading}}>{children}</AuthCtx.Provider>;
+  return <AuthCtx.Provider value={{user,signup,login,logout,updateUsage,savePost,getSavedPosts,deletePost,authLoading}}>{children}</AuthCtx.Provider>;
 }
 
 function buildPrompt(cfg,styleId){
@@ -611,7 +548,7 @@ function buildPrompt(cfg,styleId){
     question:"QUESTION: Specific debatable question → author gives unexpected answer → invite replies. 100-130 words. Max 2 hashtags."
   };
   return "LinkedIn ghostwriter. Post ONLY, no labels/preamble.\nTOPIC:"+topic+"\n"+ctx+"\n"
-    +(guides[styleId]||guides.story)+"\nRULES:Professional LinkedIn tone — suitable for any workplace audience. Human voice but absolutely no profanity, slang, expletives, or crude language. Banned clichés:game-changer,journey,thrilled,humbled,excited to share. Topic-specific. Line breaks for readability.";
+    +(guides[styleId]||guides.story)+"\nRULES:Professional LinkedIn tone suitable for any workplace audience. Human voice but no profanity, slang, expletives, or crude language. Banned words: game-changer, journey, thrilled, humbled, excited to share. NEVER use em dashes (the long dash). Use commas, full stops or new lines instead. Topic-specific. Line breaks for readability.";
 }
 
 /* ── Post generation — non-streaming (direct API) ──────────────────────────────────
@@ -925,6 +862,12 @@ function PostCard({st,text,onCopy,copied,onRetry}){
             <div>{words+" words"}</div><div>{"~"+secs+"s read"}</div>
           </div>
           <div style={{display:"flex",gap:"5px"}}>
+            {onImprove&&<button onClick={()=>onImprove(id,text)} className="btn" title="Improve this post with AI"
+              style={{padding:"6px 10px",borderRadius:"7px",border:"none",
+                background:"rgba(255,255,255,0.1)",color:"#fff",fontWeight:"700",fontSize:"12px",
+                transition:"all .2s",cursor:"pointer",whiteSpace:"nowrap"}}>
+              {"✏️ Improve"}
+            </button>}
             <SaveButton postId={id} label={label} text={text}/>
             <button onClick={()=>onCopy(id)} className="btn"
               style={{padding:"6px 12px",borderRadius:"7px",border:"none",
@@ -970,25 +913,31 @@ function ShareToLinkedIn({text,onCopy}){
   );
 }
 
-function UpgradeModal({plan,currency,onClose}){
+function UpgradeModal({plan,currency,onClose,annual=false}){
   if(!plan) plan="Pro";
   const {user}=useAuth();
   const p=PRICING[currency];
-  const price=plan==="Pro"?p.pro:p.team;
+  const [isAnnual,setIsAnnual]=useState(annual);
+  const monthlyPrice=plan==="Pro"?p.pro:p.team;
+  const annualPrice=plan==="Pro"?(currency==="GBP"?"£12":"$15"):(currency==="GBP"?"£32":"$39");
+  const price=isAnnual?annualPrice:monthlyPrice;
   const sym=p.sym;
   const feats=plan==="Pro"?PRO_FEAT:TEAM_FEAT;
   const [loading,setLoading]=useState(false);
   const [err,setErr]=useState("");
 
-  function handleCheckout(){
-    const isUK=currency==="GBP";
-    const links={
-      pro:isUK?"https://buy.stripe.com/6oUaEXafNaVL6x44uWaAw06":"https://buy.stripe.com/aFa28r87Fgg5bRo7H8aAw05",
-      team:isUK?"https://buy.stripe.com/4gM3cvgEb8NDf3A0eGaAw04":"https://buy.stripe.com/8x2fZh87F6FvcVse5waAw03",
-    };
-    const url=links[plan.toLowerCase()];
-    const email=user?.email||"";
-    window.open(url+(email?"?prefilled_email="+encodeURIComponent(email):""),"_blank");
+  async function handleCheckout(){
+    setLoading(true); setErr("");
+    try{
+      const res=await fetch("/api/checkout",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({plan:plan.toLowerCase(),currency,email:user?.email||"",annual:isAnnual})
+      });
+      const data=await res.json();
+      if(data.url){ window.location.href=data.url; }
+      else{ setErr(data.error||"Something went wrong. Please try again."); setLoading(false); }
+    }catch(e){ setErr("Could not connect. Please try again."); setLoading(false); }
   }
 
   return(
@@ -997,7 +946,15 @@ function UpgradeModal({plan,currency,onClose}){
         <div style={{fontSize:"44px",marginBottom:"12px"}}>{"🚀"}</div>
         <h2 style={{color:C.text,fontWeight:"900",fontSize:"22px",marginBottom:"8px"}}>{"Upgrade to "+plan}</h2>
         <div style={{fontSize:"36px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{price}</div>
-        <div style={{fontSize:"12px",color:C.mid,marginBottom:"20px"}}>per month · cancel anytime · secure payment by Stripe</div>
+        {/* Annual toggle */}
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"10px",marginBottom:"12px"}}>
+          <span style={{fontSize:"12px",color:isAnnual?C.dim:C.text,fontWeight:"700"}}>Monthly</span>
+          <div onClick={()=>setIsAnnual(a=>!a)} style={{width:"40px",height:"22px",borderRadius:"11px",background:isAnnual?C.amber:"rgba(255,255,255,0.1)",cursor:"pointer",position:"relative",transition:"background .2s",flexShrink:0}}>
+            <div style={{position:"absolute",top:"3px",left:isAnnual?"21px":"3px",width:"16px",height:"16px",borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+          </div>
+          <span style={{fontSize:"12px",color:isAnnual?C.text:C.dim,fontWeight:"700"}}>Annual <span style={{color:"#22c55e",fontSize:"10px"}}>Save 20%</span></span>
+        </div>
+        <div style={{fontSize:"12px",color:C.mid,marginBottom:"20px"}}>{isAnnual?"billed annually · cancel anytime · secure payment by Stripe":"per month · cancel anytime · secure payment by Stripe"}</div>
         <div style={{background:C.raised,borderRadius:"10px",padding:"14px 16px",marginBottom:"20px",border:"1px solid "+C.border,textAlign:"left"}}>
           <div style={{fontWeight:"700",color:C.text,marginBottom:"8px",fontSize:"13px"}}>{"What's included:"}</div>
           {feats.slice(0,5).map(f=>(
@@ -1067,6 +1024,10 @@ function Nav({page,goPage,currency,toggleCurrency}){
                     style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"8px 12px",borderRadius:"7px",border:"none",background:page==="myposts"?"rgba(200,117,51,0.1)":"transparent",color:page==="myposts"?C.amber:C.mid,cursor:"pointer",fontSize:"13px"}}>
                     {"🔖 My saved posts"}
                   </button>
+                  <button onClick={()=>{navGo("account");setMenu(false);}} className="btn"
+                    style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"8px 12px",borderRadius:"7px",border:"none",background:page==="account"?"rgba(200,117,51,0.1)":"transparent",color:page==="account"?C.amber:C.mid,cursor:"pointer",fontSize:"13px"}}>
+                    {"⚙️ Account & Billing"}
+                  </button>
                   {user?.plan==="team"&&(
                     <button onClick={()=>{setSeatsOpen(true);setMenu(false);}} className="btn"
                       style={{display:"flex",alignItems:"center",gap:"8px",width:"100%",padding:"8px 12px",borderRadius:"7px",border:"none",background:"transparent",color:C.amber,cursor:"pointer",fontSize:"13px",fontWeight:"700"}}>
@@ -1118,6 +1079,10 @@ function Nav({page,goPage,currency,toggleCurrency}){
                     {"Sign out"}
                   </button>
                 </div>
+                <button onClick={()=>navGo("account")}
+                  style={{display:"block",width:"100%",padding:"11px 14px",borderRadius:"9px",border:"none",cursor:"pointer",fontSize:"14px",fontWeight:"600",background:page==="account"?"rgba(200,117,51,0.11)":"rgba(255,255,255,0.03)",color:page==="account"?C.amber:C.mid,textAlign:"left"}}>
+                  {"⚙️ Account & Billing"}
+                </button>
                 <button onClick={()=>navGo("myposts")}
                   style={{display:"block",width:"100%",padding:"11px 14px",borderRadius:"9px",border:"none",cursor:"pointer",fontSize:"14px",fontWeight:"600",background:page==="myposts"?"rgba(200,117,51,0.11)":"rgba(255,255,255,0.03)",color:page==="myposts"?C.amber:C.mid,textAlign:"left"}}>
                   {"🔖 My saved posts"}
@@ -1138,7 +1103,7 @@ function Nav({page,goPage,currency,toggleCurrency}){
 }
 
 function AuthPage({mode,goPage}){
-  const {signup,login,loginWithGoogle}=useAuth();
+  const {signup,login}=useAuth();
   const isLogin=mode==="login";
   const [name,setName]=useState("");
   const [email,setEmail]=useState("");
@@ -1154,14 +1119,11 @@ function AuthPage({mode,goPage}){
     if(!isLogin&&pass!==confirm) e.confirm="Passwords do not match.";
     if(Object.keys(e).length){ setErr(e); return; }
     setErr({}); setLoading(true);
-    const res=await (isLogin?login(email,pass):signup(name,email,pass));
+    await new Promise(r=>setTimeout(r,600));
+    const res=isLogin?login(email,pass):signup(name,email,pass);
     setLoading(false);
     if(res.error) setErr({general:res.error});
-  }
-  async function handleGoogle(){
-    setErr({});
-    const res=await loginWithGoogle();
-    if(res.error) setErr({general:res.error});
+    else goPage("home");
   }
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
@@ -1175,17 +1137,6 @@ function AuthPage({mode,goPage}){
         </div>
         <div style={{background:C.card,borderRadius:"18px",padding:"28px 24px",border:"1px solid "+C.border}} className="up">
           {err.general&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"8px",padding:"10px 14px",marginBottom:"16px",fontSize:"13px",color:"#fca5a5"}}>{"! "+err.general}</div>}
-          <button onClick={handleGoogle} className="btn"
-            style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"10px",width:"100%",padding:"14px",borderRadius:"10px",border:"1px solid "+C.border,
-              background:C.raised,color:C.text,fontWeight:"700",fontSize:"15px",cursor:"pointer",marginBottom:"20px"}}>
-            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-            {isLogin?"Sign in with Google":"Sign up with Google"}
-          </button>
-          <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"20px"}}>
-            <div style={{flex:1,height:"1px",background:C.border}}/>
-            <span style={{color:C.dim,fontSize:"12px",fontWeight:"600"}}>or</span>
-            <div style={{flex:1,height:"1px",background:C.border}}/>
-          </div>
           {!isLogin&&<Input label="Full name" value={name} onChange={setName} placeholder="Marvin Campbell" err={err.name}/>}
           <Input label="Email address" value={email} onChange={setEmail} placeholder="you@company.com" type="email" err={err.email}/>
           <Input label="Password" value={pass} onChange={setPass} placeholder="Min 6 characters" type="password" err={err.pass}/>
@@ -1202,6 +1153,9 @@ function AuthPage({mode,goPage}){
           <button onClick={()=>goPage(isLogin?"signup":"login")} style={{background:"none",border:"none",color:C.amber,cursor:"pointer",fontWeight:"700",fontSize:"13px"}}>
             {isLogin?"Sign up free":"Sign in"}
           </button>
+        </div>
+        <div style={{textAlign:"center",marginTop:"10px"}} className="up">
+          <button onClick={()=>goPage("home")} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>Continue without account</button>
         </div>
       </div>
     </div>
@@ -1267,89 +1221,184 @@ function OnboardingModal({onComplete}){
     try{ localStorage.setItem("pl_onboarded","1"); }catch(e){}
     onComplete({industry:ind,role:rol,goal:gol});
   }
-  const progress=(step/STEPS*100)+"%";
+  function skip(){ try{localStorage.setItem("pl_onboarded","1");}catch(e){} onComplete({}); }
+  const GOAL_ICONS={audience:"📈",leads:"🎯",authority:"🏆",win:"🙌",engage:"💬",network:"🤝"};
   return(
-    <div style={{position:"fixed",inset:0,zIndex:800,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",animation:"in .3s ease"}}>
-      <div style={{background:C.card,borderRadius:"20px",padding:"32px 28px",maxWidth:"440px",width:"100%",border:"1px solid rgba(200,117,51,0.3)",animation:"up .35s ease"}}>
-        <div style={{height:"3px",background:C.raised,borderRadius:"2px",marginBottom:"24px",overflow:"hidden"}}>
-          <div style={{height:"100%",background:GRAD_AMBER,width:progress,transition:"width .4s ease",borderRadius:"2px"}}/>
+    <div style={{position:"fixed",inset:0,zIndex:800,background:"rgba(0,0,0,0.92)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px",animation:"in .3s ease"}}>
+      <div style={{background:C.card,borderRadius:"20px",overflow:"hidden",maxWidth:"460px",width:"100%",border:"1px solid rgba(200,117,51,0.35)",animation:"up .35s ease"}}>
+
+        {/* Orange top bar with logo + step counter */}
+        <div style={{background:GRAD_AMBER,padding:"16px 24px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+            <span style={{fontSize:"20px"}}>🚀</span>
+            <span style={{color:"#fff",fontWeight:"900",fontSize:"16px"}}>PostLift</span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:"6px"}}>
+            {[1,2,3].map(n=>(
+              <div key={n} style={{width:n===step?"24px":"8px",height:"8px",borderRadius:"4px",background:n<=step?"rgba(255,255,255,0.9)":"rgba(255,255,255,0.3)",transition:"all .3s ease"}}/>
+            ))}
+          </div>
         </div>
-        {step===1&&(
-          <div className="in">
-            <div style={{fontSize:"22px",marginBottom:"8px"}}>👋</div>
-            <h2 style={{color:C.text,fontWeight:"900",fontSize:"20px",margin:"0 0 6px"}}>Welcome to PostLift</h2>
-            <p style={{color:C.mid,fontSize:"13px",margin:"0 0 20px",lineHeight:1.7}}>Three quick questions so PostLift writes posts that sound like you. Takes 20 seconds.</p>
-            <Select label="What industry are you in?" value={ind} onChange={setInd} options={INDUSTRIES} placeholder="Select your industry..."/>
-            <button onClick={()=>ind?setStep(2):null} className="btn"
-              style={{width:"100%",padding:"13px",borderRadius:"10px",border:"none",background:ind?GRAD_AMBER:"#1c2130",color:ind?"#fff":C.dim,fontWeight:"700",fontSize:"14px",cursor:ind?"pointer":"not-allowed",marginTop:"4px"}}>
-              Continue
-            </button>
-          </div>
-        )}
-        {step===2&&(
-          <div className="in">
-            <div style={{fontSize:"22px",marginBottom:"8px"}}>💼</div>
-            <h2 style={{color:C.text,fontWeight:"900",fontSize:"20px",margin:"0 0 6px"}}>What is your role?</h2>
-            <p style={{color:C.mid,fontSize:"13px",margin:"0 0 20px",lineHeight:1.7}}>This shapes the voice and perspective PostLift writes with.</p>
-            <Select label="Your role" value={rol} onChange={setRol} options={ROLES} placeholder="Select your role..."/>
-            <div style={{display:"flex",gap:"8px",marginTop:"4px"}}>
-              <button onClick={()=>setStep(1)} style={{flex:1,padding:"13px",borderRadius:"10px",border:"1px solid "+C.border,background:"transparent",color:C.mid,fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>Back</button>
-              <button onClick={()=>rol?setStep(3):null} className="btn"
-                style={{flex:2,padding:"13px",borderRadius:"10px",border:"none",background:rol?GRAD_AMBER:"#1c2130",color:rol?"#fff":C.dim,fontWeight:"700",fontSize:"14px",cursor:rol?"pointer":"not-allowed"}}>
-                Continue
+
+        <div style={{padding:"28px 26px"}}>
+
+          {step===1&&(
+            <div className="in">
+              <div style={{marginBottom:"20px"}}>
+                <h2 style={{color:C.text,fontWeight:"900",fontSize:"22px",margin:"0 0 8px",lineHeight:1.2}}>Before you start,<br/>tell us about yourself</h2>
+                <p style={{color:C.mid,fontSize:"13px",margin:0,lineHeight:1.7}}>PostLift uses this to write posts that sound like you, not a generic AI. Takes 30 seconds.</p>
+              </div>
+              <div style={{background:"rgba(200,117,51,0.07)",border:"1px solid rgba(200,117,51,0.2)",borderRadius:"10px",padding:"12px 14px",marginBottom:"20px",display:"flex",alignItems:"flex-start",gap:"10px"}}>
+                <span style={{fontSize:"18px",flexShrink:0}}>💡</span>
+                <div style={{fontSize:"12px",color:C.mid,lineHeight:1.6}}>
+                  <strong style={{color:C.amber}}>Why this matters:</strong> Two people with the same topic in different industries get completely different posts. Your industry shapes the language, examples and tone.
+                </div>
+              </div>
+              <Select label="What industry are you in? *" value={ind} onChange={setInd} options={INDUSTRIES} placeholder="Choose your industry..."/>
+              <button onClick={()=>ind?setStep(2):null} className="btn"
+                style={{width:"100%",padding:"14px",borderRadius:"10px",border:"none",background:ind?GRAD_AMBER:"#1c2130",color:ind?"#fff":C.dim,fontWeight:"800",fontSize:"15px",cursor:ind?"pointer":"not-allowed",marginTop:"6px",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+                {ind?"Continue →":"Select your industry to continue"}
+              </button>
+              <button onClick={skip} style={{display:"block",width:"100%",textAlign:"center",marginTop:"12px",background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>
+                Skip setup (you can do this later in settings)
               </button>
             </div>
-          </div>
-        )}
-        {step===3&&(
-          <div className="in">
-            <div style={{fontSize:"22px",marginBottom:"8px"}}>🎯</div>
-            <h2 style={{color:C.text,fontWeight:"900",fontSize:"20px",margin:"0 0 6px"}}>What is your main LinkedIn goal?</h2>
-            <p style={{color:C.mid,fontSize:"13px",margin:"0 0 20px",lineHeight:1.7}}>PostLift will write with this in mind every time.</p>
-            <div style={{display:"flex",flexWrap:"wrap",gap:"8px",marginBottom:"20px"}}>
-              {GOALS.map(g=>(
-                <button key={g.v} onClick={()=>setGol(g.v)} className="btn"
-                  style={{padding:"9px 16px",borderRadius:"20px",border:"1.5px solid "+(gol===g.v?C.amber:C.border),background:gol===g.v?"rgba(200,117,51,0.12)":"transparent",color:gol===g.v?C.amber:C.mid,fontWeight:"600",fontSize:"13px",cursor:"pointer"}}>
-                  {g.l}
+          )}
+
+          {step===2&&(
+            <div className="in">
+              <div style={{marginBottom:"20px"}}>
+                <div style={{fontSize:"11px",color:C.amber,fontWeight:"700",textTransform:"uppercase",letterSpacing:".5px",marginBottom:"6px"}}>Step 2 of 3</div>
+                <h2 style={{color:C.text,fontWeight:"900",fontSize:"22px",margin:"0 0 8px",lineHeight:1.2}}>What is your role?</h2>
+                <p style={{color:C.mid,fontSize:"13px",margin:0,lineHeight:1.7}}>A founder and a recruiter in the same industry write very differently. This shapes your voice.</p>
+              </div>
+              <Select label="Your role *" value={rol} onChange={setRol} options={ROLES} placeholder="Choose your role..."/>
+              {rol&&(
+                <div style={{background:"rgba(34,197,94,0.07)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:"8px",padding:"10px 12px",marginTop:"4px",marginBottom:"8px",fontSize:"12px",color:"#6ee7b7",display:"flex",alignItems:"center",gap:"8px"}} className="in">
+                  <span>✓</span> PostLift will write as a {rol}
+                </div>
+              )}
+              <div style={{display:"flex",gap:"8px",marginTop:"8px"}}>
+                <button onClick={()=>setStep(1)} style={{flex:1,padding:"13px",borderRadius:"10px",border:"1px solid "+C.border,background:"transparent",color:C.mid,fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>Back</button>
+                <button onClick={()=>rol?setStep(3):null} className="btn"
+                  style={{flex:2,padding:"13px",borderRadius:"10px",border:"none",background:rol?GRAD_AMBER:"#1c2130",color:rol?"#fff":C.dim,fontWeight:"800",fontSize:"15px",cursor:rol?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+                  {rol?"Continue →":"Select your role"}
                 </button>
-              ))}
+              </div>
             </div>
-            <div style={{display:"flex",gap:"8px"}}>
-              <button onClick={()=>setStep(2)} style={{flex:1,padding:"13px",borderRadius:"10px",border:"1px solid "+C.border,background:"transparent",color:C.mid,fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>Back</button>
-              <button onClick={finish} className="btn"
-                style={{flex:2,padding:"13px",borderRadius:"10px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer"}}>
-                Start generating posts
-              </button>
+          )}
+
+          {step===3&&(
+            <div className="in">
+              <div style={{marginBottom:"20px"}}>
+                <div style={{fontSize:"11px",color:C.amber,fontWeight:"700",textTransform:"uppercase",letterSpacing:".5px",marginBottom:"6px"}}>Last step</div>
+                <h2 style={{color:C.text,fontWeight:"900",fontSize:"22px",margin:"0 0 8px",lineHeight:1.2}}>What do you want LinkedIn to do for you?</h2>
+                <p style={{color:C.mid,fontSize:"13px",margin:0,lineHeight:1.7}}>Every post PostLift writes will be angled towards this goal.</p>
+              </div>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"8px",marginBottom:"20px"}}>
+                {GOALS.map(g=>(
+                  <button key={g.v} onClick={()=>setGol(g.v)} className="btn"
+                    style={{padding:"12px 14px",borderRadius:"10px",border:"2px solid "+(gol===g.v?C.amber:C.border),background:gol===g.v?"rgba(200,117,51,0.12)":"transparent",color:gol===g.v?C.amber:C.mid,fontWeight:"600",fontSize:"13px",cursor:"pointer",textAlign:"left",display:"flex",alignItems:"center",gap:"8px",transition:"all .15s"}}>
+                    <span style={{fontSize:"18px"}}>{GOAL_ICONS[g.v]||"🎯"}</span>
+                    <span>{g.l}</span>
+                  </button>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:"8px"}}>
+                <button onClick={()=>setStep(2)} style={{flex:1,padding:"13px",borderRadius:"10px",border:"1px solid "+C.border,background:"transparent",color:C.mid,fontWeight:"600",fontSize:"14px",cursor:"pointer"}}>Back</button>
+                <button onClick={finish} className="btn"
+                  style={{flex:2,padding:"14px",borderRadius:"10px",border:"none",background:gol?GRAD_AMBER:"#1c2130",color:gol?"#fff":C.dim,fontWeight:"800",fontSize:"15px",cursor:gol?"pointer":"not-allowed",display:"flex",alignItems:"center",justifyContent:"center",gap:"8px"}}>
+                  {gol?"Start generating posts →":"Pick a goal"}
+                </button>
+              </div>
+              {gol&&(
+                <div style={{background:"rgba(34,197,94,0.07)",border:"1px solid rgba(34,197,94,0.2)",borderRadius:"8px",padding:"10px 12px",marginTop:"12px",fontSize:"12px",color:"#6ee7b7",lineHeight:1.6,display:"flex",gap:"8px",alignItems:"flex-start"}} className="in">
+                  <span style={{flexShrink:0}}>✓</span>
+                  <span>You are all set. PostLift will write {ind} posts for a {rol||"professional"} focused on {GOALS.find(g=>g.v===gol)?.l?.toLowerCase()||"your goal"}.</span>
+                </div>
+              )}
             </div>
-            <button onClick={()=>{ try{localStorage.setItem("pl_onboarded","1");}catch(e){} onComplete({}); }}
-              style={{display:"block",width:"100%",textAlign:"center",marginTop:"10px",background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>
-              Skip for now
-            </button>
-          </div>
-        )}
+          )}
+
+        </div>
       </div>
     </div>
   );
 }
+/* ─── BOLT-ON STRIP — shows after post generation ───────────────────────── */
+function BoltOnStrip({currency,isPaid,onUpgrade}){
+  const p=PRICING[currency];
+  const [openAddon,setOpenAddon]=useState(null);
+
+  // Four most contextually useful tools right after generation
+  const STRIP=[
+    {id:"comment",  icon:"💬", label:"First Comment Kit",   pitch:"Post the right first comment within 60 mins — boosts reach by up to 3x.", price:currency==="GBP"?"£0.99":"$1.29"},
+    {id:"repurpose",icon:"🔁", label:"Repurpose Pack",      pitch:"Turn any of these posts into a Twitter thread, email and video script.", price:currency==="GBP"?"£1.49":"$1.99"},
+    {id:"improver", icon:"✏️", label:"Post Improver",       pitch:"Paste any post back in and get a tighter, stronger version in seconds.", price:null},
+    {id:"hooks",    icon:"🪝", label:"Hook Pack",           pitch:"20 scroll-stopping opening lines tailored to your industry.", price:currency==="GBP"?"£1.99":"$2.49"},
+  ];
+
+  return(
+    <div style={{marginTop:"8px",marginBottom:"4px"}}>
+      {openAddon&&<AddonModal addonId={openAddon} currency={currency} onClose={()=>setOpenAddon(null)}/>}
+      <div style={{fontSize:"11px",fontWeight:"700",color:"#606878",textTransform:"uppercase",letterSpacing:".5px",marginBottom:"8px",paddingLeft:"2px"}}>
+        Make these posts work harder
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(min(200px,100%),1fr))",gap:"8px"}}>
+        {STRIP.map(tool=>(
+          <div key={tool.id} onClick={()=>setOpenAddon(tool.id)}
+            style={{background:"#0f1623",border:"1px solid #1e2d45",borderRadius:"12px",padding:"14px 15px",cursor:"pointer",transition:"all .18s",display:"flex",flexDirection:"column",gap:"6px",userSelect:"none"}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor="#c87533";e.currentTarget.style.background="rgba(200,117,51,0.06)";}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor="#1e2d45";e.currentTarget.style.background="#0f1623";}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"8px"}}>
+              <div style={{display:"flex",alignItems:"center",gap:"7px"}}>
+                <span style={{fontSize:"16px"}}>{tool.icon}</span>
+                <span style={{fontSize:"12px",fontWeight:"800",color:"#e8ecf4"}}>{tool.label}</span>
+              </div>
+              {isPaid
+                ?<span style={{fontSize:"10px",color:"#22c55e",fontWeight:"700",whiteSpace:"nowrap"}}>Included</span>
+                :tool.price
+                  ?<span style={{fontSize:"11px",fontWeight:"700",color:"#c87533",whiteSpace:"nowrap"}}>{tool.price}</span>
+                  :<span style={{fontSize:"10px",color:"#22c55e",fontWeight:"700",whiteSpace:"nowrap"}}>Pro</span>
+              }
+            </div>
+            <div style={{fontSize:"11px",color:"#9ca3af",lineHeight:1.5}}>{tool.pitch}</div>
+            <div style={{fontSize:"11px",fontWeight:"700",color:"#c87533",marginTop:"2px"}}>{isPaid?"Open tool →":"Try it →"}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function PostUpsellPanel({isPaid,rem,currency,upsellAddon,showUpsell,onDismissUpsell,onUpgrade,goPage}){
   const p=PRICING[currency];
   const [addonOpen,setAddonOpen]=useState(null);
 
   // Three contextual nudges that rotate based on state
+  const [proNudge,setProNudge]=useState(()=>["repurpose","hooks","comment","improver","pillars"][Math.floor(Math.random()*5)]);
+
   if(isPaid){
-    // Pro/Team user — show addon cross-sell only
+    const nudgeCfg={
+      repurpose:{id:"repurpose",headline:"Make these posts work harder",body:"Turn any LinkedIn post into a Twitter thread, email intro and short-form video script."},
+      hooks:{id:"hooks",headline:"Need a stronger opening?",body:"Get 20 scroll-stopping hook ideas tailored to your industry and role."},
+      comment:{id:"comment",headline:"Boost reach with a first comment",body:"Posting the right first comment within 60 mins can boost reach by up to 3x."},
+      improver:{id:"improver",headline:"Want to sharpen any post?",body:"The Post Improver rewrites your draft with a stronger hook, tighter copy and a clearer CTA."},
+      pillars:{id:"pillars",headline:"Never run out of ideas",body:"Build your full content strategy — 5 pillars, each with 8 specific post ideas."},
+    };
+    const n=nudgeCfg[proNudge]||nudgeCfg.repurpose;
     return(
       <div className="in" style={{marginTop:"8px"}}>
         {addonOpen&&<AddonModal addonId={addonOpen} currency={currency} onClose={()=>setAddonOpen(null)}/>}
         <div style={{background:C.raised,border:"1px solid "+C.border,borderRadius:"14px",padding:"18px 20px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"16px",flexWrap:"wrap"}}>
-          <div>
-            <div style={{fontSize:"13px",fontWeight:"700",color:C.text,marginBottom:"3px"}}>Make these posts work harder</div>
-            <div style={{fontSize:"12px",color:C.mid}}>Turn any post into a Twitter thread, newsletter intro and video script with the Repurpose Pack.</div>
+          <div style={{flex:1,minWidth:"180px"}}>
+            <div style={{fontSize:"13px",fontWeight:"700",color:C.text,marginBottom:"3px"}}>{n.headline}</div>
+            <div style={{fontSize:"12px",color:C.mid,lineHeight:1.5}}>{n.body}</div>
           </div>
-          <button onClick={()=>setAddonOpen("repurpose")} className="btn"
+          <button onClick={()=>setAddonOpen(n.id)} className="btn"
             style={{padding:"9px 18px",borderRadius:"8px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"12px",cursor:"pointer",flexShrink:0,whiteSpace:"nowrap"}}>
-            {"Repurpose — "+p.sym+(currency==="GBP"?"1.49":"1.99")}
+            {ADDON_CFG[n.id]?.icon+" "+ADDON_CFG[n.id]?.title+" →"}
           </button>
         </div>
       </div>
@@ -1444,11 +1493,29 @@ function HomePage({currency,isUK,goPage}){
   const [showEmailBanner,setShowEmailBanner]=useState(false);
   const [showUpsell,setShowUpsell]=useState(false);
   const [upsellAddon,setUpsellAddon]=useState(null);
+  const [improveOpen,setImproveOpen]=useState(false);
+  const [improvePost,setImprovePost]=useState(null);
 
   useEffect(()=>{
     try{
       const done=localStorage.getItem("pl_onboarded");
       if(!done) setTimeout(()=>setShowOnboard(true),800);
+    }catch(e){}
+  },[]);
+
+  // Detect post-Stripe-checkout return: ?addon_success=hooks&session_id=...
+  useEffect(()=>{
+    try{
+      const params=new URLSearchParams(window.location.search);
+      const addonId=params.get("addon_success");
+      if(addonId){
+        // Store purchase in localStorage so the modal unlocks
+        const key="pl_addon_purchased_"+addonId;
+        localStorage.setItem(key,"1");
+        // Clean the URL
+        const clean=window.location.pathname;
+        window.history.replaceState({},"",clean);
+      }
     }catch(e){}
   },[]);
 
@@ -1551,6 +1618,7 @@ function HomePage({currency,isUK,goPage}){
     <div>
       {showOnboard&&<OnboardingModal onComplete={handleOnboardComplete}/>}
       {showUpgrade&&<UpgradeModal plan="Pro" currency={currency} onClose={()=>setShowUpgrade(false)}/>}
+      {improveOpen&&improvePost&&<AddonModal addonId="improver" currency={currency} prefillPost={improvePost.txt} onClose={()=>{setImproveOpen(false);setImprovePost(null);}}/>}
       {showEmailBanner&&<EmailCaptureBanner onClose={()=>setShowEmailBanner(false)}/>}
       <div style={{textAlign:"center",padding:"36px 0 22px"}} className="in">
         <div style={{display:"inline-flex",alignItems:"center",gap:"6px",background:"rgba(230,125,50,0.1)",border:"1px solid rgba(230,125,50,0.25)",borderRadius:"20px",padding:"5px 14px",fontSize:"11px",fontWeight:"700",color:C.amber,marginBottom:"14px",textTransform:"uppercase",letterSpacing:".5px"}}>
@@ -1602,7 +1670,13 @@ function HomePage({currency,isUK,goPage}){
         )}
         {step===2&&(
           <div>
-            <div style={{fontSize:"12px",fontWeight:"700",color:C.amber,marginBottom:"12px"}}>Optional - each field sharpens what PostLift writes</div>
+            <div style={{background:"rgba(200,117,51,0.07)",border:"1px solid rgba(200,117,51,0.2)",borderRadius:"9px",padding:"12px 14px",marginBottom:"14px",display:"flex",alignItems:"flex-start",gap:"10px"}}>
+              <span style={{fontSize:"18px",flexShrink:0}}>💡</span>
+              <div>
+                <div style={{fontSize:"12px",fontWeight:"700",color:C.amber,marginBottom:"3px"}}>The more you tell PostLift, the less it has to guess</div>
+                <div style={{fontSize:"11px",color:C.mid,lineHeight:1.6}}>Every blank field gets filled with a generic assumption. Your role, goal, tone and audience turn those assumptions into posts that sound like you wrote them yourself.</div>
+              </div>
+            </div>
             <Select label="Your Role" value={role} onChange={setRole} options={ROLES} placeholder="Select your role..."/>
             <Chips label="Post Goal" options={GOALS} value={goal} onChange={setGoal}/>
             <Select label="Target Audience" value={audience} onChange={setAudience} options={AUDIENCES} placeholder="Who are you writing for?"/>
@@ -1651,18 +1725,21 @@ function HomePage({currency,isUK,goPage}){
             </div>
           )}
           {loading&&<div style={{textAlign:"center",marginBottom:"16px",animation:"pulse 1.5s infinite"}}><span style={{fontSize:"13px",color:C.dim}}>Posts appear as each one finishes generating...</span></div>}
-          {STYLES.map(s=><PostCard key={s.id} st={s} text={posts[s.id]||null} onCopy={handleCopy} copied={copied} onRetry={retryPost}/>)}
+          {STYLES.map(s=><PostCard key={s.id} st={s} text={posts[s.id]||null} onCopy={handleCopy} copied={copied} onRetry={retryPost} onImprove={isPaid?(id,txt)=>{setImprovePost({id,txt});setImproveOpen(true);}:null}/>)}
           {!loading&&posts&&Object.values(posts).some(v=>v&&v!=="__error__")&&(
-            <PostUpsellPanel
-              isPaid={isPaid}
-              rem={rem}
-              currency={currency}
-              upsellAddon={upsellAddon}
-              showUpsell={showUpsell}
-              onDismissUpsell={()=>setShowUpsell(false)}
-              onUpgrade={()=>setShowUpgrade(true)}
-              goPage={goPage}
-            />
+            <>
+              <BoltOnStrip currency={currency} isPaid={isPaid} onUpgrade={()=>setShowUpgrade(true)}/>
+              <PostUpsellPanel
+                isPaid={isPaid}
+                rem={rem}
+                currency={currency}
+                upsellAddon={upsellAddon}
+                showUpsell={showUpsell}
+                onDismissUpsell={()=>setShowUpsell(false)}
+                onUpgrade={()=>setShowUpgrade(true)}
+                goPage={goPage}
+              />
+            </>
           )}
         </div>
       )}
@@ -1765,7 +1842,7 @@ const ADDON_CFG = {
       {key:"target",label:"Who do you want to attract?",placeholder:"e.g. SaaS founders looking for a head of marketing",required:true},
       {key:"outcome",label:"What do you want them to do?",placeholder:"e.g. Book a discovery call, follow me, DM me",required:false},
     ],
-    buildPrompt:(v)=>"You are a LinkedIn profile specialist. Rewrite this person's LinkedIn profile to attract their ideal audience and prompt action.\n\nCurrent headline: "+v.current_headline+"\nCurrent About: "+v.current_about+"\nTarget audience: "+v.target+(v.outcome?"\nDesired outcome: "+v.outcome:"")+"\n\nDeliver:\n1. NEW HEADLINE (max 220 characters) — value proposition, not job title\n2. NEW ABOUT SECTION (300-400 words) — first-person, conversational, specific achievements, ends with a clear CTA\n3. BANNER SUGGESTION — one sentence describing ideal LinkedIn banner image/text\n\nRules:\n- Sound like a real human, not a CV\n- No buzzwords: passionate, results-driven, dynamic, synergy\n- No profanity or unprofessional language\n- Specific over vague — achievements with numbers where possible\n- Output with clear section headers: HEADLINE / ABOUT / BANNER SUGGESTION",
+    buildPrompt:(v)=>"You are a LinkedIn profile specialist. Rewrite this person's LinkedIn profile to attract their ideal audience and prompt action.\n\nCurrent headline: "+v.current_headline+"\nCurrent About: "+v.current_about+"\nTarget audience: "+v.target+(v.outcome?"\nDesired outcome: "+v.outcome:"")+"\n\nDeliver:\n1. NEW HEADLINE (max 220 characters) ,  value proposition, not job title\n2. NEW ABOUT SECTION (300-400 words) ,  first-person, conversational, specific achievements, ends with a clear CTA\n3. BANNER SUGGESTION ,  one sentence describing ideal LinkedIn banner image/text\n\nRules:\n- Sound like a real human, not a CV\n- No buzzwords: passionate, results-driven, dynamic, synergy\n- No profanity or unprofessional language\n- Specific over vague ,  achievements with numbers where possible\n- Output with clear section headers: HEADLINE / ABOUT / BANNER SUGGESTION",
     resultLabel:"Your rewritten LinkedIn profile",
     resultHint:"Copy each section and update your LinkedIn profile. The headline goes in your name field area, About in your About section.",
   },
@@ -1781,7 +1858,7 @@ const ADDON_CFG = {
       {key:"target_role",label:"Who you are reaching out to",placeholder:"e.g. HR Directors at mid-size tech companies",required:true},
       {key:"purpose",label:"Why you are connecting",placeholder:"e.g. To offer LinkedIn content services, to recruit for a role, to explore partnerships",required:true},
     ],
-    buildPrompt:(v)=>"You are an expert in LinkedIn cold outreach. Write 10 LinkedIn connection request and follow-up DM templates.\n\nSender role: "+v.your_role+"\nTarget: "+v.target_role+"\nPurpose: "+v.purpose+"\n\nDeliver:\n- 5 CONNECTION REQUEST notes (max 300 characters each — LinkedIn limit)\n- 5 FOLLOW-UP DM templates (max 100 words each, for after connection is accepted)\n\nRules:\n- Never start with 'I came across your profile'\n- No copy-paste feel — each must feel personal and specific\n- Lead with value or curiosity, not the ask\n- No profanity, crude language or informal slang\n- The ask must be small (a reply, a thought, a quick call — never a sale in message 1)\n- Label clearly: CONNECTION 1, CONNECTION 2... DM 1, DM 2...\n- Output ONLY the templates, no preamble",
+    buildPrompt:(v)=>"You are an expert in LinkedIn cold outreach. Write 10 LinkedIn connection request and follow-up DM templates.\n\nSender role: "+v.your_role+"\nTarget: "+v.target_role+"\nPurpose: "+v.purpose+"\n\nDeliver:\n- 5 CONNECTION REQUEST notes (max 300 characters each ,  LinkedIn limit)\n- 5 FOLLOW-UP DM templates (max 100 words each, for after connection is accepted)\n\nRules:\n- Never start with 'I came across your profile'\n- No copy-paste feel ,  each must feel personal and specific\n- Lead with value or curiosity, not the ask\n- No profanity, crude language or informal slang\n- The ask must be small (a reply, a thought, a quick call ,  never a sale in message 1)\n- Label clearly: CONNECTION 1, CONNECTION 2... DM 1, DM 2...\n- Output ONLY the templates, no preamble",
     resultLabel:"Your 10 outreach templates",
     resultHint:"Personalise [brackets] before sending. Connection notes go in the Connect > Add a note field. DMs go in Message after connecting.",
   },
@@ -1798,7 +1875,7 @@ const ADDON_CFG = {
       {key:"goal",label:"Your LinkedIn goal",placeholder:"e.g. Generate leads, build thought leadership, attract job offers",required:true},
       {key:"avoid",label:"Topics you want to avoid (optional)",placeholder:"e.g. politics, personal life, competitor names",required:false},
     ],
-    buildPrompt:(v)=>"You are a LinkedIn content strategist. Build a complete content pillar strategy for this professional.\n\nIndustry: "+v.industry+"\nRole: "+v.role+"\nGoal: "+v.goal+(v.avoid?"\nAvoid: "+v.avoid:"")+"\n\nDeliver exactly 5 content pillars. For each pillar:\n- PILLAR NAME (3-4 words)\n- WHY IT WORKS (1 sentence — why this resonates with their audience)\n- 8 SPECIFIC POST IDEAS (not generic topics — actual post angles with a hook)\n\nRules:\n- Pillars must be distinct — no overlap\n- Post ideas must be specific to their industry and role\n- Mix formats across ideas: story, listicle, hot take, question, humble brag\n- Professional tone — no profanity or crude language\n- Output with clear formatting. No preamble.",
+    buildPrompt:(v)=>"You are a LinkedIn content strategist. Build a complete content pillar strategy for this professional.\n\nIndustry: "+v.industry+"\nRole: "+v.role+"\nGoal: "+v.goal+(v.avoid?"\nAvoid: "+v.avoid:"")+"\n\nDeliver exactly 5 content pillars. For each pillar:\n- PILLAR NAME (3-4 words)\n- WHY IT WORKS (1 sentence ,  why this resonates with their audience)\n- 8 SPECIFIC POST IDEAS (not generic topics ,  actual post angles with a hook)\n\nRules:\n- Pillars must be distinct ,  no overlap\n- Post ideas must be specific to their industry and role\n- Mix formats across ideas: story, listicle, hot take, question, humble brag\n- Professional tone ,  no profanity or crude language\n- Output with clear formatting. No preamble.",
     resultLabel:"Your content pillar strategy",
     resultHint:"Pin this somewhere visible. Rotate through your pillars so your feed stays varied and your audience stays engaged.",
   },
@@ -1814,7 +1891,7 @@ const ADDON_CFG = {
       {key:"target",label:"Who do you want to attract?",placeholder:"e.g. Startup founders needing a fractional CMO",required:true},
       {key:"cta",label:"What should readers do?",placeholder:"e.g. Visit my website, DM me, download my guide",required:false},
     ],
-    buildPrompt:(v)=>"You are a LinkedIn profile copywriter. Rewrite this person's About section to attract their ideal audience.\n\nCurrent About: "+v.current+"\nTarget audience: "+v.target+(v.cta?"\nDesired action: "+v.cta:"")+"\n\nDeliver a rewritten About section:\n- 300-400 words\n- First person, conversational — not a CV\n- Opens with a hook (not 'I am a...')\n- Covers: what they do, who they help, what makes them different, proof/results, CTA\n- No buzzwords: passionate, results-driven, dynamic, leverage, synergy\n- No profanity or unprofessional language\n- Ends with a specific CTA\n- Output ONLY the About section text, nothing else",
+    buildPrompt:(v)=>"You are a LinkedIn profile copywriter. Rewrite this person's About section to attract their ideal audience.\n\nCurrent About: "+v.current+"\nTarget audience: "+v.target+(v.cta?"\nDesired action: "+v.cta:"")+"\n\nDeliver a rewritten About section:\n- 300-400 words\n- First person, conversational ,  not a CV\n- Opens with a hook (not 'I am a...')\n- Covers: what they do, who they help, what makes them different, proof/results, CTA\n- No buzzwords: passionate, results-driven, dynamic, leverage, synergy\n- No profanity or unprofessional language\n- Ends with a specific CTA\n- Output ONLY the About section text, nothing else",
     resultLabel:"Your rewritten About section",
     resultHint:"Copy this and paste it into LinkedIn > Edit profile > About. You have up to 2,600 characters — this fits comfortably.",
   },
@@ -1828,7 +1905,7 @@ const ADDON_CFG = {
     inputs:[
       {key:"post",label:"Your LinkedIn post",placeholder:"Paste the LinkedIn post you want to repurpose...",required:true,multiline:true,rows:6},
     ],
-    buildPrompt:(v)=>"You are a multi-platform content strategist. Repurpose this LinkedIn post into 3 different formats.\n\nORIGINAL POST:\n"+v.post+"\n\nDeliver:\n\n1. TWITTER/X THREAD\n- 5-7 tweets\n- Each tweet max 280 characters\n- Thread hook must be stronger than the LinkedIn opening\n- Number each tweet (1/, 2/, etc.)\n\n2. EMAIL NEWSLETTER INTRO\n- 150-200 words\n- Conversational, warm tone\n- Ends with a teaser to read more or take action\n- Include a suggested subject line\n\n3. SHORT-FORM VIDEO SCRIPT\n- 45-60 seconds when spoken at normal pace\n- Written as a spoken script (not a post)\n- Opens with a hook that works for TikTok/Reels/Shorts\n- Include [PAUSE] and [EMPHASIS] stage directions\n- Professional tone across all formats — no profanity or crude language\n\nOutput with clear section headers. No preamble.",
+    buildPrompt:(v)=>"You are a multi-platform content strategist. Repurpose this LinkedIn post into 3 different formats.\n\nORIGINAL POST:\n"+v.post+"\n\nDeliver:\n\n1. TWITTER/X THREAD\n- 5-7 tweets\n- Each tweet max 280 characters\n- Thread hook must be stronger than the LinkedIn opening\n- Number each tweet (1/, 2/, etc.)\n\n2. EMAIL NEWSLETTER INTRO\n- 150-200 words\n- Conversational, warm tone\n- Ends with a teaser to read more or take action\n- Include a suggested subject line\n\n3. SHORT-FORM VIDEO SCRIPT\n- 45-60 seconds when spoken at normal pace\n- Written as a spoken script (not a post)\n- Opens with a hook that works for TikTok/Reels/Shorts\n- Include [PAUSE] and [EMPHASIS] stage directions\n- Professional tone across all formats ,  no profanity or crude language\n\nOutput with clear section headers. No preamble.",
     resultLabel:"Your repurposed content",
     resultHint:"Each format is ready to use on its platform. Personalise before posting — small edits make it feel native to each channel.",
   },
@@ -1843,9 +1920,24 @@ const ADDON_CFG = {
       {key:"post",label:"Your LinkedIn post",placeholder:"Paste the post you are about to publish...",required:true,multiline:true,rows:5},
       {key:"goal",label:"What do you want the comment to do?",placeholder:"e.g. Drive link clicks, invite replies, add extra context, promote a service",required:false},
     ],
-    buildPrompt:(v)=>"You are a LinkedIn growth expert. Write the perfect first comment for this LinkedIn post.\n\nPOST:\n"+v.post+(v.goal?"\n\nComment goal: "+v.goal:"")+"\n\nDeliver 3 different first comment options:\n\nCOMMENT A — Adds value (extra insight, resource, or expansion of the post idea)\nCOMMENT B — Drives engagement (asks a question that provokes replies)\nCOMMENT C — Promotes action (a soft CTA — link, DM invitation, or next step)\n\nRules for all:\n- Max 3 sentences each\n- Sound like the post author speaking naturally — not a marketer\n- No emojis unless the post uses them\n- Comment A and B should have zero self-promotion\n- No profanity, slang or unprofessional language\n- Output with labels COMMENT A / B / C only. No preamble.",
+    buildPrompt:(v)=>"You are a LinkedIn growth expert. Write the perfect first comment for this LinkedIn post.\n\nPOST:\n"+v.post+(v.goal?"\n\nComment goal: "+v.goal:"")+"\n\nDeliver 3 different first comment options:\n\nCOMMENT A ,  Adds value (extra insight, resource, or expansion of the post idea)\nCOMMENT B ,  Drives engagement (asks a question that provokes replies)\nCOMMENT C ,  Promotes action (a soft CTA ,  link, DM invitation, or next step)\n\nRules for all:\n- Max 3 sentences each\n- Sound like the post author speaking naturally ,  not a marketer\n- No emojis unless the post uses them\n- Comment A and B should have zero self-promotion\n- No profanity, slang or unprofessional language\n- Output with labels COMMENT A / B / C only. No preamble.",
     resultLabel:"Your first comment options",
     resultHint:"Post one of these as your very first comment within 60 minutes of publishing. This signals to LinkedIn the post is getting engagement and boosts early distribution.",
+  },
+  improver: {
+    id:"improver",
+    title:"Post Improver",
+    icon:"✏️",
+    price_gbp:"0",
+    price_usd:"0",
+    needsStripe: true,
+    inputs:[
+      {key:"post",label:"Your post",placeholder:"Paste the LinkedIn post you want to improve...",required:true,multiline:true,rows:6},
+      {key:"goal",label:"What should change? (optional)",placeholder:"e.g. Make the hook stronger, cut 30 words, add more emotion, make it punchier",required:false},
+    ],
+    buildPrompt:(v)=>"You are an expert LinkedIn copywriter. Improve this LinkedIn post without losing the author's voice.\n\nORIGINAL POST:\n"+v.post+(v.goal?"\n\nFocus: "+v.goal:"")+"\n\nDeliver:\n1. IMPROVED VERSION ,  rewrite the post with a stronger hook, tighter sentences and a clearer CTA. Keep the same core message and first-person voice.\n2. WHAT CHANGED ,  3 bullet points explaining the main improvements made.\n\nRules:\n- Keep the author's voice ,  do not make it sound corporate or generic\n- Do not change the core message or facts\n- No buzzwords: journey, thrilled, humbled, game-changer\n- No profanity or unprofessional language\n- Output with clear headers: IMPROVED VERSION / WHAT CHANGED",
+    resultLabel:"Your improved post",
+    resultHint:"Copy the IMPROVED VERSION section and paste it over your original draft. The 'What Changed' section explains every edit.",
   },
   credits: {
     id:"credits",
@@ -1853,7 +1945,7 @@ const ADDON_CFG = {
     icon:"⚡",
     price_gbp:"2.49",
     price_usd:"2.99",
-    needsStripe: false,
+    needsStripe: true,
     inputs:[],
     buildPrompt:()=>"",
     resultLabel:"",
@@ -1862,18 +1954,94 @@ const ADDON_CFG = {
 };
 
 /* ─── ADD-ON MODAL ────────────────────────────────────────────────────────── */
-function AddonModal({addonId,currency,onClose}){
+function AddonModal({addonId,currency,onClose,prefillPost=null}){
   const cfg=ADDON_CFG[addonId];
   if(!cfg) return null;
+  const {user}=useAuth();
   const p=PRICING[currency];
   const price=currency==="GBP"?cfg.price_gbp:cfg.price_usd;
   const sym=p.sym;
 
-  const [vals,setVals]=useState({});
+  const [vals,setVals]=useState(()=>prefillPost?{post:prefillPost}:{});
   const [loading,setLoading]=useState(false);
   const [result,setResult]=useState(null);
   const [err,setErr]=useState("");
   const [copied,setCopied]=useState(false);
+
+  // Plan check
+  const isPaid=user&&(user.plan==="pro"||user.plan==="team");
+  // Check if user has purchased this addon individually
+  const [addonPurchased,setAddonPurchased]=useState(()=>{
+    try{ return !!localStorage.getItem("pl_addon_purchased_"+addonId); }catch(e){ return false; }
+  });
+  const [buyLoading,setBuyLoading]=useState(false);
+  const [buyErr,setBuyErr]=useState("");
+  const [showProInstead,setShowProInstead]=useState(false);
+
+  async function handleBuyAddon(){
+    setBuyLoading(true); setBuyErr("");
+    try{
+      const res=await fetch("/api/checkout-addon",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({addonId,currency,email:user?.email||""})
+      });
+      const data=await res.json();
+      if(data.url){ window.location.href=data.url; }
+      else{ setBuyErr(data.error||"Could not start checkout. Please try again."); setBuyLoading(false); }
+    }catch(e){ setBuyErr("Could not connect. Please check your internet."); setBuyLoading(false); }
+  }
+
+  // 🔒 PAYWALL GATE — free users who haven't purchased this addon individually
+  if(cfg.needsStripe && !isPaid && !addonPurchased){
+    if(showProInstead) return <UpgradeModal plan="Pro" currency={currency} onClose={onClose}/>;
+    return(
+      <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px",animation:"in .2s ease",overflowY:"auto"}}>
+        <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:"14px",overflow:"hidden",maxWidth:"480px",width:"100%",border:"1px solid "+C.border,animation:"up .3s ease",margin:"auto"}}>
+          {/* Orange header */}
+          <div style={{background:GRAD_AMBER,padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px"}}>
+            <div style={{display:"flex",alignItems:"center",gap:"10px"}}>
+              <span style={{fontSize:"22px"}}>{cfg.icon}</span>
+              <div style={{color:"#fff",fontWeight:"800",fontSize:"15px"}}>{cfg.title}</div>
+            </div>
+            <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,0.8)",cursor:"pointer",fontSize:"22px",lineHeight:1,padding:"2px 0"}}>×</button>
+          </div>
+          {/* Body */}
+          <div style={{padding:"24px 22px"}}>
+            <p style={{color:C.mid,fontSize:"13px",lineHeight:1.7,margin:"0 0 22px"}}>{cfg.inputs.length>0?"Fill in your details and get your output instantly.":"Your purchase is processed instantly."}</p>
+            {/* Option A: Buy just this tool */}
+            <div style={{background:C.raised,border:"2px solid "+C.amber,borderRadius:"12px",padding:"18px 20px",marginBottom:"12px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"8px",flexWrap:"wrap",gap:"8px"}}>
+                <div style={{fontWeight:"800",color:C.text,fontSize:"14px"}}>Buy just this tool</div>
+                <div style={{fontWeight:"900",fontSize:"20px",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{sym+price}</div>
+              </div>
+              <div style={{fontSize:"12px",color:C.mid,lineHeight:1.6,marginBottom:"14px"}}>One-time purchase. Yours to use any time. No subscription.</div>
+              {buyErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"7px",padding:"8px 12px",marginBottom:"10px",fontSize:"12px",color:"#fca5a5"}}>{"! "+buyErr}</div>}
+              <button onClick={handleBuyAddon} disabled={buyLoading} className="btn"
+                style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",width:"100%",padding:"13px",borderRadius:"9px",border:"none",background:buyLoading?"#1c2130":GRAD_AMBER,color:buyLoading?C.dim:"#fff",fontWeight:"800",fontSize:"14px",cursor:buyLoading?"not-allowed":"pointer"}}>
+                {buyLoading?<><Spinner/>{"Redirecting to checkout..."}</>:"Buy now → "+sym+price}
+              </button>
+            </div>
+            {/* Option B: Go Pro */}
+            <div style={{background:C.raised,border:"1px solid "+C.border,borderRadius:"12px",padding:"18px 20px"}}>
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:"6px",flexWrap:"wrap",gap:"8px"}}>
+                <div style={{fontWeight:"800",color:C.text,fontSize:"14px"}}>Upgrade to Pro</div>
+                <div style={{fontWeight:"700",color:C.amber,fontSize:"13px"}}>{p.pro+"/month"}</div>
+              </div>
+              <div style={{fontSize:"12px",color:C.mid,lineHeight:1.6,marginBottom:"12px"}}>Get this tool plus all other add-ons, unlimited post generations, content library and more — for one monthly price.</div>
+              <button onClick={()=>setShowProInstead(true)} className="btn"
+                style={{width:"100%",padding:"11px",borderRadius:"9px",border:"1px solid rgba(200,117,51,0.4)",background:"transparent",color:C.amber,fontWeight:"700",fontSize:"13px",cursor:"pointer"}}>
+                See what Pro includes
+              </button>
+            </div>
+            <div style={{textAlign:"center",marginTop:"14px"}}>
+              <button onClick={onClose} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>Maybe later</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Credits add-on — payment only, no AI
   if(!cfg.needsStripe || addonId==="credits"){
@@ -1885,10 +2053,30 @@ function AddonModal({addonId,currency,onClose}){
           <div style={{fontSize:"32px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",marginBottom:"4px"}}>{price}</div>
           <p style={{color:C.mid,fontSize:"13px",lineHeight:1.7,margin:"0 0 20px"}}>15 extra post generations added instantly to your account. Available to Pro and Team subscribers.</p>
           <div style={{background:"rgba(200,117,51,0.07)",border:"1px solid rgba(200,117,51,0.2)",borderRadius:"10px",padding:"14px",marginBottom:"20px",fontSize:"12px",color:C.mid,lineHeight:1.6}}>
-            Until Stripe is connected, credits reset monthly on the free tier. Pro gives you unlimited generations and removes this limit entirely.
+            15 extra generations added to your account as soon as payment is confirmed. Pro gives you unlimited generations and removes the monthly limit entirely.
           </div>
-          <button onClick={onClose} style={{display:"block",width:"100%",padding:"12px",borderRadius:"9px",border:"none",background:GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer",marginBottom:"8px"}}>Got it</button>
-          <button onClick={onClose} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>Close</button>
+          {(()=>{
+            const [bl,setBl]=useState(false);
+            const [be,setBe]=useState("");
+            async function buyCredits(){
+              setBl(true); setBe("");
+              try{
+                const res=await fetch("/api/checkout-addon",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({addonId:"credits",currency,email:user?.email||""})});
+                const d=await res.json();
+                if(d.url){ window.location.href=d.url; }
+                else{ setBe(d.error||"Something went wrong."); setBl(false); }
+              }catch(e){ setBe("Could not connect."); setBl(false); }
+            }
+            return(
+              <>
+                {be&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"7px",padding:"8px 12px",marginBottom:"10px",fontSize:"12px",color:"#fca5a5"}}>{"! "+be}</div>}
+                <button onClick={buyCredits} disabled={bl} style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"8px",width:"100%",padding:"12px",borderRadius:"9px",border:"none",background:bl?"#1c2130":GRAD_AMBER,color:bl?C.dim:"#fff",fontWeight:"700",fontSize:"14px",cursor:bl?"not-allowed":"pointer",marginBottom:"8px"}}>
+                  {bl?<><Spinner/>{"Redirecting..."}></>:"Buy credits → "+sym+price}
+                </button>
+                <button onClick={onClose} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"12px"}}>Close</button>
+              </>
+            );
+          })()}
         </div>
       </div>
     );
@@ -1930,68 +2118,81 @@ function AddonModal({addonId,currency,onClose}){
 
   return(
     <div onClick={onClose} style={{position:"fixed",inset:0,zIndex:1000,background:"rgba(0,0,0,0.88)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"20px",animation:"in .2s ease",overflowY:"auto"}}>
-      <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:"20px",padding:"28px 24px",maxWidth:"580px",width:"100%",border:"1px solid rgba(200,117,51,0.35)",animation:"up .3s ease",margin:"auto"}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:C.card,borderRadius:"14px",overflow:"hidden",maxWidth:"580px",width:"100%",border:"1px solid "+C.border,animation:"up .3s ease",margin:"auto"}}>
 
-        {/* Header */}
-        <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:"12px",marginBottom:"20px"}}>
-          <div style={{display:"flex",alignItems:"center",gap:"12px"}}>
-            <div style={{fontSize:"28px",width:"52px",height:"52px",borderRadius:"14px",background:"rgba(200,117,51,0.12)",border:"1px solid rgba(200,117,51,0.25)",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{cfg.icon}</div>
-            <div>
-              <h2 style={{color:C.text,fontWeight:"900",fontSize:"18px",margin:"0 0 3px"}}>{cfg.title}</h2>
-              <div style={{fontSize:"15px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text"}}>{sym+price+" — one-time"}</div>
+        {/* Orange header — matches PostCard style */}
+        <div style={{background:GRAD_AMBER,padding:"13px 18px",display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px"}}>
+          <div style={{display:"flex",alignItems:"center",gap:"10px",minWidth:0}}>
+            <span style={{fontSize:"22px",lineHeight:1,flexShrink:0}}>{cfg.icon}</span>
+            <div style={{minWidth:0}}>
+              <div style={{color:"#fff",fontWeight:"800",fontSize:"15px",lineHeight:1.2}}>{cfg.title}</div>
+              <div style={{color:"rgba(255,255,255,0.75)",fontSize:"11px",marginTop:"2px"}}>{isPaid?"✓ Included in your Pro plan":addonPurchased?"✓ Purchased":"✓ Unlocked"}</div>
             </div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:"22px",lineHeight:1,flexShrink:0,padding:"2px"}}>×</button>
+          <button onClick={onClose} style={{background:"none",border:"none",color:"rgba(255,255,255,0.8)",cursor:"pointer",fontSize:"22px",lineHeight:1,flexShrink:0,padding:"2px 0"}}>×</button>
         </div>
 
-        {(()=>{const lim=checkAddonLimit(addonId);return(
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",background:"rgba(200,117,51,0.06)",border:"1px solid rgba(200,117,51,0.15)",borderRadius:"9px",padding:"10px 14px",fontSize:"12px",marginBottom:"20px",flexWrap:"wrap"}}>
-            <span style={{color:C.mid,lineHeight:1.5}}>Real AI output generated live for Pro and Team subscribers.</span>
-            <span style={{color:lim.used>=lim.limit-1?C.amber:C.green,fontWeight:"700",whiteSpace:"nowrap",flexShrink:0}}>{(lim.limit-lim.used)+" uses left today"}</span>
-          </div>
-        );})()}
+        {/* Body */}
+        <div style={{padding:"20px 22px"}}>
 
-        {/* Input form (hidden once result shown) */}
-        {!result&&(
-          <div>
-            {cfg.inputs.map(inp=>(
-              inp.multiline
-                ? <Textarea key={inp.key} label={inp.label+(inp.required?" *":"")} value={vals[inp.key]||""} onChange={v=>setVals(prev=>({...prev,[inp.key]:v}))} placeholder={inp.placeholder} rows={inp.rows||4} maxLen={2000}/>
-                : <Input key={inp.key} label={inp.label+(inp.required?" *":"")} value={vals[inp.key]||""} onChange={v=>setVals(prev=>({...prev,[inp.key]:v}))} placeholder={inp.placeholder}/>
-            ))}
-            {err&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"8px",padding:"10px 14px",marginBottom:"14px",fontSize:"13px",color:"#fca5a5"}}>{"! "+err}</div>}
-            <button onClick={run} disabled={loading} className="btn"
-              style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"10px",width:"100%",padding:"14px",borderRadius:"10px",border:"none",background:loading?"#1c2130":GRAD_AMBER,color:loading?C.dim:"#fff",fontWeight:"700",fontSize:"15px",cursor:loading?"not-allowed":"pointer"}}>
-              {loading?<><Spinner/>{"Generating with AI..."}</>:"Generate — "+sym+price}
-            </button>
-          </div>
-        )}
+          {/* Input form (hidden once result shown) */}
+          {!result&&(
+            <div>
+              {cfg.inputs.map(inp=>(
+                inp.multiline
+                  ? <Textarea key={inp.key} label={inp.label+(inp.required?" *":"")} value={vals[inp.key]||""} onChange={v=>setVals(prev=>({...prev,[inp.key]:v}))} placeholder={inp.placeholder} rows={inp.rows||4} maxLen={2000}/>
+                  : <Input key={inp.key} label={inp.label+(inp.required?" *":"")} value={vals[inp.key]||""} onChange={v=>setVals(prev=>({...prev,[inp.key]:v}))} placeholder={inp.placeholder}/>
+              ))}
+              {err&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"8px",padding:"10px 14px",marginBottom:"14px",fontSize:"13px",color:"#fca5a5"}}>{"! "+err}</div>}
+              <button onClick={run} disabled={loading} className="btn"
+                style={{display:"flex",alignItems:"center",justifyContent:"center",gap:"10px",width:"100%",padding:"14px",borderRadius:"10px",border:"none",background:loading?"#1c2130":GRAD_AMBER,color:loading?C.dim:"#fff",fontWeight:"700",fontSize:"15px",cursor:loading?"not-allowed":"pointer"}}>
+                {loading?<><Spinner/>{"Generating with AI..."}</>:"Generate with AI →"}
+              </button>
+            </div>
+          )}
 
-        {/* Result */}
-        {result&&(
-          <div className="in">
-            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",marginBottom:"12px",flexWrap:"wrap"}}>
-              <div style={{fontSize:"13px",fontWeight:"700",color:C.green}}>{"✓ "+cfg.resultLabel}</div>
-              <div style={{display:"flex",gap:"8px"}}>
-                <button onClick={()=>setResult(null)} className="btn" style={{padding:"7px 14px",borderRadius:"8px",border:"1px solid "+C.border,background:"transparent",color:C.mid,fontWeight:"600",fontSize:"12px",cursor:"pointer"}}>Start over</button>
-                <button onClick={doCopy} className="btn" style={{padding:"7px 14px",borderRadius:"8px",border:"none",background:copied?"rgba(34,197,94,0.85)":GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"12px",cursor:"pointer",transition:"all .2s"}}>{copied?"Copied!":"Copy all"}</button>
+          {/* Result — styled like PostCard body */}
+          {result&&(
+            <div className="in">
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:"10px",marginBottom:"10px",flexWrap:"wrap"}}>
+                <div style={{fontSize:"13px",fontWeight:"700",color:C.green}}>{"✓ "+cfg.resultLabel}</div>
+                <div style={{display:"flex",gap:"8px"}}>
+                  <button onClick={()=>setResult(null)} className="btn" style={{padding:"6px 13px",borderRadius:"7px",border:"1px solid "+C.border,background:"transparent",color:C.mid,fontWeight:"600",fontSize:"12px",cursor:"pointer"}}>Start over</button>
+                  <button onClick={doCopy} className="btn" style={{padding:"6px 13px",borderRadius:"7px",border:"none",background:copied?"rgba(34,197,94,0.85)":GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"12px",cursor:"pointer",transition:"all .2s"}}>{copied?"Copied!":"Copy all"}</button>
+                </div>
+              </div>
+              <div style={{background:C.card,border:"1px solid "+C.border,borderRadius:"10px",padding:"16px 18px",fontSize:"13px",color:C.mid,lineHeight:1.85,whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:"400px",overflowY:"auto",marginBottom:"10px"}}>{result}</div>
+              {cfg.resultHint&&(
+                <div style={{background:"rgba(200,117,51,0.06)",border:"1px solid rgba(200,117,51,0.15)",borderRadius:"8px",padding:"10px 14px",fontSize:"11px",color:C.mid,lineHeight:1.6}}>
+                  <span style={{color:C.amber,fontWeight:"700"}}>Tip: </span>{cfg.resultHint}
+                </div>
+              )}
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",paddingTop:"12px",marginTop:"10px",borderTop:"1px solid "+C.border}}>
+                <span style={{fontSize:"11px",color:C.dim}}>Ready? Copy and paste into LinkedIn.</span>
+                <button onClick={doCopy} className="btn" style={{display:"inline-flex",alignItems:"center",gap:"6px",padding:"7px 14px",borderRadius:"8px",border:"none",background:copied?"rgba(34,197,94,0.85)":GRAD_AMBER,color:"#fff",fontWeight:"700",fontSize:"12px",cursor:"pointer",transition:"all .25s"}}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+                  {copied?"Pasted!":"Open in LinkedIn"}
+                </button>
               </div>
             </div>
-            <div style={{background:C.raised,border:"1px solid "+C.border,borderRadius:"10px",padding:"16px 18px",fontSize:"13px",color:C.mid,lineHeight:1.85,whiteSpace:"pre-wrap",wordBreak:"break-word",maxHeight:"380px",overflowY:"auto",marginBottom:"12px"}}>{result}</div>
-            {cfg.resultHint&&<div style={{background:"rgba(200,117,51,0.06)",border:"1px solid rgba(200,117,51,0.15)",borderRadius:"8px",padding:"10px 14px",fontSize:"11px",color:C.mid,lineHeight:1.6}}>{"Tip: "+cfg.resultHint}</div>}
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
 function MicroCard({item,currency}){
+  const {user}=useAuth();
+  const isPaid=user&&(user.plan==="pro"||user.plan==="team");
   const [hov,setHov]=useState(false);
   const [open,setOpen]=useState(false);
   const addonKey=Object.keys(ADDON_CFG).find(k=>ADDON_CFG[k].title===item.title);
   const hasAddon=!!addonKey;
-  const btnLabel=addonKey==="credits"?"Buy credits":hasAddon?"Try it now — "+item.price:"Coming soon";
+  const btnLabel=addonKey==="credits"
+    ?(isPaid?"Add more credits":"Buy credits")
+    :!hasAddon?"Coming soon"
+    :isPaid?"Open tool — included ✓":"Buy "+item.price+" →";
   return(
     <>
       {open&&addonKey&&<AddonModal addonId={addonKey} currency={currency} onClose={()=>setOpen(false)}/>}
@@ -2021,7 +2222,10 @@ function MicroCard({item,currency}){
           <div style={{fontSize:"22px",width:"40px",height:"40px",borderRadius:"10px",background:hov?"rgba(200,117,51,0.15)":"rgba(255,255,255,0.04)",border:"1px solid "+(hov?"rgba(200,117,51,0.3)":"rgba(255,255,255,0.06)"),display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0,transition:"all .2s"}}>{item.icon}</div>
           <div>
             <div style={{fontWeight:"700",fontSize:"13px",color:C.text,lineHeight:1.3}}>{item.title}</div>
-            <div style={{fontSize:"16px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",lineHeight:1.2,marginTop:"2px"}}>{item.price}</div>
+            {isPaid
+              ?<div style={{fontSize:"12px",fontWeight:"700",color:"#22c55e",marginTop:"2px"}}>✓ Included in Pro</div>
+              :<div style={{fontSize:"16px",fontWeight:"900",background:GRAD_AMBER,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",backgroundClip:"text",lineHeight:1.2,marginTop:"2px"}}>{item.price}</div>
+            }
           </div>
         </div>
         <div style={{fontSize:"12px",color:hov?"#9ca3af":C.dim,lineHeight:1.6,flex:1,transition:"color .2s"}}>{item.desc}</div>
@@ -2252,7 +2456,7 @@ function PricingPage({currency,goPage}){
   ];
   return(
     <div className="in">
-      {upgradeModal&&<UpgradeModal plan={upgradeModal==="pro"?"Pro":"Team"} currency={currency} onClose={()=>setUpgradeModal(null)}/>}
+      {upgradeModal&&<UpgradeModal plan={upgradeModal==="pro"?"Pro":"Team"} currency={currency} annual={annual} onClose={()=>setUpgradeModal(null)}/>}
       <div style={{textAlign:"center",padding:"36px 0 28px"}}>
         <h2 style={{fontSize:"clamp(20px,4vw,36px)",fontWeight:"900",color:C.text,margin:"0 0 6px"}}>Simple, transparent pricing</h2>
         <p style={{color:C.mid,fontSize:"14px",margin:"0 0 12px"}}>Start free. Upgrade when ready.</p>
@@ -2881,6 +3085,30 @@ function ToolsPage(){
 
 function MyPostsPage({goPage}){
   const {user,getSavedPosts:getSavedPostsDB,deletePost:deletePostDB}=useAuth();
+  const isPaid=user&&(user.plan==="pro"||user.plan==="team");
+
+  // 🔒 Gate: Content Library is a Pro feature
+  if(!user){
+    return(
+      <div style={{textAlign:"center",padding:"80px 20px"}}>
+        <div style={{fontSize:"48px",marginBottom:"16px"}}>🔒</div>
+        <h2 style={{color:"#e8ecf4",fontWeight:"900",fontSize:"22px",margin:"0 0 10px"}}>Sign in to access your library</h2>
+        <p style={{color:"#9ca3af",fontSize:"14px",marginBottom:"24px",lineHeight:1.7}}>Create a free account to save and manage your posts.</p>
+        <button onClick={()=>goPage("signup")} style={{padding:"12px 28px",borderRadius:"10px",border:"none",background:"linear-gradient(135deg,#c87533,#a8622c)",color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer"}}>Sign in or create account</button>
+      </div>
+    );
+  }
+  if(!isPaid){
+    return(
+      <div style={{textAlign:"center",padding:"80px 20px"}}>
+        <div style={{fontSize:"48px",marginBottom:"16px"}}>🔖</div>
+        <h2 style={{color:"#e8ecf4",fontWeight:"900",fontSize:"22px",margin:"0 0 10px"}}>Content Library is a Pro feature</h2>
+        <p style={{color:"#9ca3af",fontSize:"14px",marginBottom:"24px",lineHeight:1.7,maxWidth:"400px",margin:"0 auto 24px"}}>Save, tag and search all your best posts. Upgrade to Pro to unlock your personal content library.</p>
+        <button onClick={()=>goPage("pricing")} style={{padding:"12px 28px",borderRadius:"10px",border:"none",background:"linear-gradient(135deg,#c87533,#a8622c)",color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer"}}>Upgrade to Pro →</button>
+      </div>
+    );
+  }
+
   const [saved,setSaved]=useState([]);
   const [search,setSearch]=useState("");
   const [copied,setCopied]=useState(null);
@@ -2989,6 +3217,99 @@ function MyPostsPage({goPage}){
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+
+/* ─── ACCOUNT PAGE ───────────────────────────────────────────────────────── */
+function AccountPage({goPage,currency}){
+  const {user,logout}=useAuth();
+  const p=PRICING[currency];
+  const [portalLoading,setPortalLoading]=useState(false);
+  const [portalErr,setPortalErr]=useState("");
+
+  async function openBillingPortal(){
+    setPortalLoading(true); setPortalErr("");
+    try{
+      const res=await fetch("/api/billing-portal",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email:user?.email||""})
+      });
+      const data=await res.json();
+      if(data.url){ window.location.href=data.url; }
+      else{ setPortalErr(data.error||"Could not open billing portal. Contact app@marvanova.com"); setPortalLoading(false); }
+    }catch(e){ setPortalErr("Could not connect. Try again or email app@marvanova.com"); setPortalLoading(false); }
+  }
+
+  if(!user) return(
+    <div style={{textAlign:"center",padding:"80px 20px"}}>
+      <div style={{fontSize:"48px",marginBottom:"16px"}}>🔒</div>
+      <h2 style={{color:"#e8ecf4",fontWeight:"900",fontSize:"22px",margin:"0 0 10px"}}>Sign in to view your account</h2>
+      <button onClick={()=>goPage("login")} style={{padding:"12px 28px",borderRadius:"10px",border:"none",background:"linear-gradient(135deg,#c87533,#a8622c)",color:"#fff",fontWeight:"700",fontSize:"14px",cursor:"pointer"}}>Sign in</button>
+    </div>
+  );
+
+  const planLabel=user.plan==="pro"?"Pro":user.plan==="team"?"Team":"Free";
+  const isPaid=user.plan==="pro"||user.plan==="team";
+
+  return(
+    <div className="in" style={{paddingTop:"32px",maxWidth:"600px",margin:"0 auto"}}>
+      <h2 style={{fontSize:"clamp(20px,4vw,30px)",fontWeight:"900",color:"#e8ecf4",margin:"0 0 6px"}}>Your Account</h2>
+      <p style={{color:"#9ca3af",fontSize:"13px",marginBottom:"28px"}}>{user.email}</p>
+
+      {/* Plan card */}
+      <div style={{background:"#0f1623",border:"1px solid #1e2d45",borderRadius:"14px",overflow:"hidden",marginBottom:"16px"}}>
+        <div style={{background:"linear-gradient(135deg,#c87533,#a8622c)",padding:"14px 20px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{color:"#fff",fontWeight:"800",fontSize:"16px"}}>Current Plan</div>
+          <div style={{background:"rgba(255,255,255,0.2)",color:"#fff",borderRadius:"20px",padding:"3px 12px",fontSize:"12px",fontWeight:"700"}}>{planLabel}</div>
+        </div>
+        <div style={{padding:"18px 20px"}}>
+          {isPaid?(
+            <>
+              <div style={{fontSize:"13px",color:"#9ca3af",lineHeight:1.7,marginBottom:"16px"}}>
+                You are on the <strong style={{color:"#e8ecf4"}}>{planLabel} plan</strong>. Unlimited post generations, all add-on tools, and content library included.
+              </div>
+              {portalErr&&<div style={{background:"rgba(239,68,68,0.1)",border:"1px solid rgba(239,68,68,0.3)",borderRadius:"8px",padding:"10px 14px",marginBottom:"12px",fontSize:"12px",color:"#fca5a5"}}>{portalErr}</div>}
+              <button onClick={openBillingPortal} disabled={portalLoading}
+                style={{display:"flex",alignItems:"center",gap:"8px",padding:"11px 20px",borderRadius:"9px",border:"none",background:portalLoading?"#1c2130":"linear-gradient(135deg,#c87533,#a8622c)",color:portalLoading?"#606878":"#fff",fontWeight:"700",fontSize:"13px",cursor:portalLoading?"not-allowed":"pointer",marginBottom:"8px",width:"100%",justifyContent:"center"}}>
+                {portalLoading?"Opening...":"Manage subscription, invoices and billing →"}
+              </button>
+              <div style={{fontSize:"11px",color:"#606878",textAlign:"center"}}>Cancel, change plan, update card or download invoices via the secure Stripe portal.</div>
+            </>
+          ):(
+            <>
+              <div style={{fontSize:"13px",color:"#9ca3af",lineHeight:1.7,marginBottom:"16px"}}>
+                You are on the <strong style={{color:"#e8ecf4"}}>Free plan</strong> — {5} post generations per month. Upgrade to Pro for unlimited generations and all add-on tools.
+              </div>
+              <button onClick={()=>goPage("pricing")}
+                style={{width:"100%",padding:"12px",borderRadius:"9px",border:"none",background:"linear-gradient(135deg,#c87533,#a8622c)",color:"#fff",fontWeight:"700",fontSize:"13px",cursor:"pointer"}}>
+                Upgrade to Pro — {p.pro}/month
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Profile card */}
+      <div style={{background:"#0f1623",border:"1px solid #1e2d45",borderRadius:"14px",padding:"18px 20px",marginBottom:"16px"}}>
+        <div style={{fontSize:"13px",fontWeight:"700",color:"#e8ecf4",marginBottom:"14px"}}>Account Details</div>
+        <div style={{display:"grid",gap:"8px"}}>
+          {[["Email",user.email],["Plan",planLabel],["Member since",user.createdAt?new Date(user.createdAt).toLocaleDateString("en-GB",{day:"numeric",month:"long",year:"numeric"}):"—"]].map(([label,val])=>(
+            <div key={label} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"1px solid #1e2d45"}}>
+              <span style={{fontSize:"12px",color:"#9ca3af"}}>{label}</span>
+              <span style={{fontSize:"12px",color:"#e8ecf4",fontWeight:"600"}}>{val}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sign out */}
+      <button onClick={()=>{logout();goPage("home");}}
+        style={{width:"100%",padding:"12px",borderRadius:"9px",border:"1px solid #1e2d45",background:"transparent",color:"#9ca3af",fontWeight:"600",fontSize:"13px",cursor:"pointer",marginBottom:"40px"}}>
+        Sign out
+      </button>
     </div>
   );
 }
@@ -3259,7 +3580,6 @@ function CookieBanner({onAccept,onDecline}){
 }
 
 function AppInner(){
-  const {user,authLoading}=useAuth();
   const [page,setPage]=useState("home");
   const [installPrompt,setInstallPrompt]=useState(null);
   const [showInstall,setShowInstall]=useState(false);
@@ -3269,27 +3589,38 @@ function AppInner(){
     return ()=>window.removeEventListener("beforeinstallprompt",handler);
   },[]);
   async function doInstall(){ if(installPrompt){ await installPrompt.prompt(); setShowInstall(false); } }
-  // Handle Stripe success/cancel redirect
+  // Handle Stripe redirect — plan upgrade confirmed via server-side webhook only
   useEffect(()=>{
     const params=new URLSearchParams(window.location.search);
     const upgrade=params.get("upgrade");
-    const plan=params.get("plan");
-    if(upgrade==="success"&&plan){
-      // Auto-upgrade user plan in localStorage
-      try{
-        const cu=JSON.parse(localStorage.getItem("pl_user")||"null");
-        if(cu){
-          // Update plan in Supabase
-          fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({action:"upgrade",userId:cu.id,plan})}).catch(()=>{});
-          cu.plan=plan;
-          localStorage.setItem("pl_user",JSON.stringify(cu));
-        }
-      }catch(e){}
+    if(upgrade==="pending"){
       window.history.replaceState({},"","/");
-      alert("🎉 Welcome to "+plan.charAt(0).toUpperCase()+plan.slice(1)+"! Your account has been upgraded.");
+      try{
+        const t=document.createElement("div");
+        t.textContent="Payment confirmed! Your account is being upgraded and will be ready in a few seconds.";
+        Object.assign(t.style,{position:"fixed",bottom:"24px",left:"50%",transform:"translateX(-50%)",
+          background:"#22c55e",color:"#fff",padding:"14px 22px",borderRadius:"12px",fontSize:"14px",
+          fontWeight:"700",zIndex:"9999",boxShadow:"0 8px 24px rgba(0,0,0,0.4)",maxWidth:"90vw",textAlign:"center"});
+        document.body.appendChild(t);
+        setTimeout(()=>{try{document.body.removeChild(t);}catch(e){}},7000);
+      }catch(e){}
     } else if(upgrade==="cancelled"){
       window.history.replaceState({},"","/");
+    }
+    // Addon purchase success
+    const addonId=params.get("addon_success");
+    if(addonId){
+      try{
+        localStorage.setItem("pl_addon_purchased_"+addonId,"1");
+        window.history.replaceState({},"","/");
+        const t=document.createElement("div");
+        t.textContent="Purchase confirmed! Your tool is now unlocked.";
+        Object.assign(t.style,{position:"fixed",bottom:"24px",left:"50%",transform:"translateX(-50%)",
+          background:"#22c55e",color:"#fff",padding:"14px 22px",borderRadius:"12px",fontSize:"14px",
+          fontWeight:"700",zIndex:"9999",boxShadow:"0 8px 24px rgba(0,0,0,0.4)",maxWidth:"90vw",textAlign:"center"});
+        document.body.appendChild(t);
+        setTimeout(()=>{try{document.body.removeChild(t);}catch(e){}},5000);
+      }catch(e){}
     }
   },[]);
   const [currency,setCurrency]=useState("USD");
@@ -3309,17 +3640,7 @@ function AppInner(){
   },[]);
   function goPage(p){ setPage(p); try{window.scrollTo(0,0);}catch(e){} }
   function toggleCurrency(){ /* currency is locked to detected location */ }
-  if(authLoading){
-    return(
-      <div style={{minHeight:"100vh",background:C.bg,display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'Segoe UI',system-ui,sans-serif"}}>
-        <Spinner size={28} color={C.amber}/>
-      </div>
-    );
-  }
-  if(!user){
-    const authMode=page==="signup"?"signup":"login";
-    return <AuthPage mode={authMode} goPage={goPage}/>;
-  }
+  const isAuthPage=page==="login"||page==="signup";
   return(
     <div style={{minHeight:"100vh",background:C.bg,fontFamily:"'Segoe UI',system-ui,sans-serif",color:C.text}}>
       {showInstall&&<div style={{position:"fixed",bottom:"80px",left:"50%",transform:"translateX(-50%)",zIndex:9999,background:C.card,border:"1px solid "+C.amber,borderRadius:"14px",padding:"14px 18px",display:"flex",alignItems:"center",gap:"12px",boxShadow:"0 8px 32px rgba(0,0,0,0.5)",maxWidth:"340px",width:"90%"}}>
@@ -3331,28 +3652,34 @@ function AppInner(){
         <button onClick={doInstall} style={{background:GRAD_AMBER,color:"#fff",border:"none",borderRadius:"8px",padding:"7px 12px",fontWeight:"700",fontSize:"12px",cursor:"pointer"}}>Install</button>
         <button onClick={()=>setShowInstall(false)} style={{background:"none",border:"none",color:C.dim,fontSize:"18px",cursor:"pointer",padding:"0 4px"}}>×</button>
       </div>}
-      <Nav page={page} goPage={goPage} currency={currency} toggleCurrency={toggleCurrency}/>
-      <main style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px 80px"}}>
-        {page==="home"      &&<HomePage      currency={currency} isUK={isUK} goPage={goPage}/>}
-        {page==="features"  &&<FeaturesPage  currency={currency} goPage={goPage}/>}
-        {page==="pricing"   &&<PricingPage   currency={currency} goPage={goPage}/>}
-        {page==="tools"     &&<ToolsPage/>}
-        {page==="myposts"   &&<MyPostsPage   goPage={goPage}/>}
-        {page==="affiliates"&&<AffiliatePage currency={currency} goPage={goPage}/>}
-        {page==="about"     &&<AboutPage/>}
-        {page==="privacy"   &&<PrivacyPage/>}
-        {page==="cookies"   &&<CookiePolicyPage/>}
-        {page==="terms"     &&<TermsPage/>}
-        {page==="admin"     &&<div style={{padding:"40px 20px",textAlign:"center"}}><p style={{color:C.mid,fontSize:"14px"}}>Admin dashboard has moved.</p><a href="/admin" style={{color:C.amber,fontWeight:"700"}}>Go to /admin</a></div>}
-      </main>
-      <div style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px"}}>
-        <EmailCaptureInline source="above-footer"/>
-      </div>
-      <Footer goPage={goPage}/>
-      {cookies===null&&<CookieBanner
-        onAccept={()=>{setCookies(true);try{localStorage.setItem("pl_cc","true");}catch(e){}}  }
-        onDecline={()=>{setCookies(false);try{localStorage.setItem("pl_cc","false");}catch(e){}}}
-      />}
+      {isAuthPage
+        ?<AuthPage mode={page} goPage={goPage}/>
+        :<>
+          <Nav page={page} goPage={goPage} currency={currency} toggleCurrency={toggleCurrency}/>
+          <main style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px 80px"}}>
+            {page==="home"      &&<HomePage      currency={currency} isUK={isUK} goPage={goPage}/>}
+            {page==="features"  &&<FeaturesPage  currency={currency} goPage={goPage}/>}
+            {page==="pricing"   &&<PricingPage   currency={currency} goPage={goPage}/>}
+            {page==="tools"     &&<ToolsPage/>}
+            {page==="myposts"   &&<MyPostsPage   goPage={goPage}/>}
+            {page==="affiliates"&&<AffiliatePage currency={currency} goPage={goPage}/>}
+            {page==="about"     &&<AboutPage/>}
+            {page==="privacy"   &&<PrivacyPage/>}
+            {page==="cookies"   &&<CookiePolicyPage/>}
+            {page==="terms"     &&<TermsPage/>}
+            {page==="admin"     &&<AdminPage/>}
+            {page==="account"   &&<AccountPage   goPage={goPage} currency={currency}/>}
+          </main>
+          <div style={{maxWidth:"960px",margin:"0 auto",padding:"0 16px"}}>
+            <EmailCaptureInline source="above-footer"/>
+          </div>
+          <Footer goPage={goPage}/>
+          {cookies===null&&<CookieBanner
+            onAccept={()=>{setCookies(true);try{localStorage.setItem("pl_cc","true");}catch(e){}}  }
+            onDecline={()=>{setCookies(false);try{localStorage.setItem("pl_cc","false");}catch(e){}}}
+          />}
+        </>
+      }
     </div>
   );
 }
