@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://trypostlift.com/sitemap.xml
