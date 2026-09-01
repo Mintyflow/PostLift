@@ -2096,7 +2096,7 @@ function AddonModal({addonId,currency,onClose,prefillPost=null}){
       const res=await fetch("/api/generate",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-sonnet-4-20250514",max_tokens:1800,messages:[{role:"user",content:prompt}]})
+        body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1800,messages:[{role:"user",content:prompt}]})
       });
       if(!res.ok) throw new Error("API error "+res.status);
       const d=await res.json();
